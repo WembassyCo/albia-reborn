@@ -1,0 +1,16 @@
+{
+    "name": "Albia.Systems.SaveSystem",
+    "rootNamespace": "Albia.Systems.SaveSystem",
+    "references": [
+        "Albia.Creatures"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
