@@ -1,0 +1,25 @@
+{
+    "name": "Albia.Tests",
+    "rootNamespace": "Albia.Tests",
+    "references": [
+        "UnityEngine.CoreModule",
+        "UnityEngine.TestRunner",
+        "UnityEditor.TestRunner",
+        "Albia.Creatures"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
