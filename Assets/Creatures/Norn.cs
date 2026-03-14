@@ -192,7 +192,7 @@ namespace Albia.Creatures
             // Actions
             if (actionState.IsEating)
             {
-                ExecuteEating(deltaTime);
+                ExecuteEatingInternal(deltaTime);
             }
             else if (actionState.IsResting)
             {
@@ -228,21 +228,6 @@ namespace Albia.Creatures
                 // Apply rotation
                 float turn = actionState.TurnAmount * 90f * deltaTime;
                 transform.Rotate(0, turn, 0);
-            }
-        }
-
-        /// <summary>
-        /// Executes eating action
-        /// </summary>
-        private void ExecuteEating(float deltaTime)
-        {
-            // Reduce hunger
-            state.Hunger = Mathf.Max(0, state.Hunger - deltaTime * 0.5f);
-            
-            // Trigger reward
-            if (state.Hunger < 0.3f)
-            {
-                TriggerRewardSignal(0.5f);
             }
         }
 
