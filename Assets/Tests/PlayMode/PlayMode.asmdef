@@ -1,6 +1,6 @@
 {
-    "name": "AlbiaReborn.PlayMode.Tests",
-    "rootNamespace": "AlbiaReborn.Tests.PlayMode",
+    "name": "Albia.PlayMode.Tests",
+    "rootNamespace": "Albia.Tests.PlayMode",
     "references": [
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner",

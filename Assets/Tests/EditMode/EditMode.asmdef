@@ -1,6 +1,6 @@
 {
-    "name": "AlbiaReborn.EditMode.Tests",
-    "rootNamespace": "AlbiaReborn.Tests.EditMode",
+    "name": "Albia.EditMode.Tests",
+    "rootNamespace": "Albia.Tests.EditMode",
     "references": [
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner",
