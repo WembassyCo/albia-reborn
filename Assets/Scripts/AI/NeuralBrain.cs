@@ -1,411 +1,458 @@
+using System;
+using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.AI;
-using Albia.Creatures;
-using Albia.Core;
-using Albia.Ecology;
+using Albia.Creatures.Neural;
 
 namespace Albia.AI
 {
     /// <summary>
-    /// Bridges NeuralNet outputs to Norn actions.
-    /// MVP: Map 16 outputs to discrete actions
-    /// Full: Continuous control, learned behaviors
+    /// Bridge component that connects NeuralNet outputs to creature actions.
+    /// Maps 16 neural outputs to physical behaviors with learning feedback.
+    /// Implements INeuralBrain for loose coupling with Creatures assembly.
     /// </summary>
-    [RequireComponent(typeof(Norn))]
-    public class NeuralBrain : MonoBehaviour
+    [Serializable]
+    public class NeuralBrain : MonoBehaviour, Albia.Creatures.INeuralBrain
     {
-        [Header("Neural Network")]
-        [SerializeField] private NeuralNet neuralNet;
-        [SerializeField] private float decisionInterval = 0.1f; // 10 decisions/sec
+        [Header("Network Configuration")]
+        [Tooltip("Size of sensory input layer (24-32 typical)")]
+        [SerializeField] private int inputSize = 24;
         
-        [Header("Motor Control")]
-        [SerializeField] private float walkSpeed = 3.5f;
-        [SerializeField] private float turnSpeed = 120f;
+        [Tooltip("Size of hidden layer")]
+        [SerializeField] private int hiddenSize = 16;
+        
+        [Tooltip("Size of output layer (16 actions)")]
+        [SerializeField] private int outputSize = 16;
+
+        [Header("Action Thresholds")]
+        [Tooltip("Minimum activation to trigger an action")]
         [SerializeField] private float actionThreshold = 0.3f;
         
-        // References
-        private Norn norn;
-        private NavMeshAgent agent;
-        private ChemicalState chemicals;
+        [Tooltip("Activation threshold for movement outputs")]
+        [SerializeField] private float moveThreshold = 0.1f;
+
+        [Header("Learning Configuration")]
+        [SerializeField] private float learningRate = 0.01f;
+        [SerializeField] private float maxWeightDelta = 0.1f;
+        [SerializeField] private int memoryCapacity = 10;
+
+        // Neural network core
+        public NeuralNet Network { get; private set; }
         
-        // Sensory State
-        private float[] sensoryInputs = new float[24];
-        private float decisionTimer = 0f;
+        // Learning system
+        public HebbianLearning Learning { get; private set; }
         
-        // Action outputs
-        private Vector3 targetPosition;
-        private bool hasTarget = false;
+        // Action memory for credit assignment
+        public LearningMemory Memory { get; private set; }
         
-        // Memory for learning
-        private float lastEnergy;
-        private float[] lastChemicals;
+        // Genome reference
+        public GenomeData Genome { get; private set; }
         
-        void Awake()
+        // Current outputs cached
+        public float[] CurrentOutputs { get; private set; }
+        public float[] CurrentInputs { get; private set; }
+        public int LastWinningAction { get; private set; } = -1;
+        
+        // Sensory input system (dependency injected)
+        public SensoryInput Sensory { get; set; }
+        
+        // Events for learning signals
+        public event Action<float> OnReward;
+        public event Action<float> OnPunishment;
+        public event Action<CreatureAction> OnActionExecuted;
+
+        // Output neuron mapping (16 outputs):
+        // 0-3:   Movement (forward, backward, left, right)
+        // 4-7:   Rotation (turn left, turn right, look up, look down) 
+        // 8-11:  Actions (eat, mate, attack, rest)
+        // 12-15: Social/Context (flee, follow, explore, idle)
+        public enum OutputNeuron
         {
-            norn = GetComponent<Norn>();
-            agent = GetComponent<NavMeshAgent>();
-            chemicals = norn.Chemicals;
-            
-            // Initialize neural net from genome if available
-            if (norn.Genome != null)
-            {
-                InitializeFromGenome();
-            }
-            else
-            {
-                // Random initialization for MVP
-                neuralNet = NeuralNet.CreateRandom(24, 36, 16, 0.001f);
-            }
-            
-            lastEnergy = norn.Energy;
-            lastChemicals = new float[12];
+            MoveForward = 0,
+            MoveBackward = 1,
+            MoveLeft = 2,
+            MoveRight = 3,
+            TurnLeft = 4,
+            TurnRight = 5,
+            LookUp = 6,
+            LookDown = 7,
+            Eat = 8,
+            Mate = 9,
+            Attack = 10,
+            Rest = 11,
+            Flee = 12,
+            Follow = 13,
+            Explore = 14,
+            Idle = 15
         }
-        
-        void Start()
+
+        /// <summary>
+        /// Current action being performed
+        /// </summary>
+        public CreatureAction CurrentAction { get; private set; }
+
+        /// <summary>
+        /// Initialize the neural brain with a genome
+        /// </summary>
+        public void Initialize(GenomeData genome)
         {
-            if (agent != null)
+            Genome = genome ?? new GenomeData();
+            Network = new NeuralNet(inputSize, hiddenSize, outputSize, Genome);
+            Learning = new HebbianLearning
             {
-                agent.speed = walkSpeed;
-                agent.angularSpeed = turnSpeed;
-            }
+                LearningRate = learningRate,
+                MaxWeightDelta = maxWeightDelta
+            };
+            Memory = new LearningMemory(capacity: memoryCapacity);
+            CurrentOutputs = new float[outputSize];
+            CurrentInputs = new float[inputSize];
+            
+            Debug.Log($"[NeuralBrain] Initialized with {inputSize} inputs, {hiddenSize} hidden, {outputSize} outputs");
         }
-        
-        void Update()
+
+        /// <summary>
+        /// Process one frame: gather inputs, run network, execute action
+        /// </summary>
+        public void ProcessFrame()
         {
-            if (neuralNet == null || !norn.IsAlive) return;
-            
-            decisionTimer += Time.deltaTime;
-            
-            // Process sensory information every frame
+            if (Network == null)
+            {
+                Debug.LogWarning("[NeuralBrain] Network not initialized");
+                return;
+            }
+
+            // Gather sensory inputs
             GatherSensoryInputs();
             
-            // Make decision at interval
-            if (decisionTimer >= decisionInterval)
+            // Run neural network forward pass
+            CurrentOutputs = Network.Forward(CurrentInputs);
+            
+            // Record experience for learning
+            int winningAction = GetWinningAction();
+            if (winningAction >= 0)
             {
-                decisionTimer = 0f;
-                ProcessDecision();
-                ApplyLearningSignals();
+                Memory.RecordAction(CurrentInputs, CurrentOutputs, winningAction, Network);
+                LastWinningAction = winningAction;
             }
             
-            // Execute current target
-            ExecuteMovement();
+            // Execute the highest-activation action
+            ExecuteAction();
         }
-        
+
         /// <summary>
-        /// Initialize neural weights from genome (genes 64-191)
+        /// Gather sensory inputs from environment
+        /// 24 sensory inputs: chemical (6) + vision (6) + proximity (4) + state (8)
         /// </summary>
-        private void InitializeFromGenome()
+        protected virtual void GatherSensoryInputs()
         {
-            var genome = norn.Genome;
-            float[] weights = new float[36 * 24 + 16 * 36]; // Input-hidden + hidden-output
-            
-            // Extract weights from genome
-            int geneIndex = 64;
-            for (int i = 0; i < weights.Length && geneIndex < 192; i++, geneIndex++)
+            if (Sensory == null)
             {
-                weights[i] = genome.GetGene(geneIndex);
+                // Fallback to zeros if no sensory system attached
+                Array.Clear(CurrentInputs, 0, inputSize);
+                return;
             }
+
+            int idx = 0;
             
-            neuralNet = new NeuralNet(24, 36, 16, weights, 0.001f);
+            // Chemical inputs (6): hunger, energy, fear, pain, curiosity, comfort
+            CurrentInputs[idx++] = Sensory.Hunger;
+            CurrentInputs[idx++] = Sensory.Energy;
+            CurrentInputs[idx++] = Sensory.Fear;
+            CurrentInputs[idx++] = Sensory.Pain;
+            CurrentInputs[idx++] = Sensory.Curiosity;
+            CurrentInputs[idx++] = Sensory.Comfort;
+            
+            // Vision inputs (6): food seen, food distance, threat seen, threat distance, 
+            //                   creature seen, nearest creature distance
+            CurrentInputs[idx++] = Sensory.CanSeeFood ? 1f : 0f;
+            CurrentInputs[idx++] = Sensory.FoodDistance;
+            CurrentInputs[idx++] = Sensory.CanSeeThreat ? 1f : 0f;
+            CurrentInputs[idx++] = Sensory.ThreatDistance;
+            CurrentInputs[idx++] = Sensory.CanSeeCreature ? 1f : 0f;
+            CurrentInputs[idx++] = Sensory.NearestCreatureDistance;
+            
+            // Proximity inputs (4): wall front, wall left, wall right, obstacle detected
+            CurrentInputs[idx++] = Sensory.WallInFront ? 1f : 0f;
+            CurrentInputs[idx++] = Sensory.WallToLeft ? 1f : 0f;
+            CurrentInputs[idx++] = Sensory.WallToRight ? 1f : 0f;
+            CurrentInputs[idx++] = Sensory.ObstacleDetected ? 1f : 0f;
+            
+            // State inputs (8): can eat, can mate, can rest, time since last action,
+            //                   nearby creatures count, health, age normalized, random/novelty
+            CurrentInputs[idx++] = Sensory.CanEat ? 1f : 0f;
+            CurrentInputs[idx++] = Sensory.CanMate ? 1f : 0f;
+            CurrentInputs[idx++] = Sensory.CanRest ? 1f : 0f;
+            CurrentInputs[idx++] = Sensory.TimeSinceLastAction;
+            CurrentInputs[idx++] = Sensory.NearbyCreaturesCount;
+            CurrentInputs[idx++] = Sensory.Health;
+            CurrentInputs[idx++] = Sensory.AgeNormalized;
+            CurrentInputs[idx++] = UnityEngine.Random.value; // Novelty/dither input
         }
-        
+
         /// <summary>
-        /// Gather all sensory inputs for neural network
+        /// Get the winning action from neural outputs
+        /// Returns -1 if no action exceeds threshold
         /// </summary>
-        private void GatherSensoryInputs()
+        protected int GetWinningAction()
         {
-            // 0-3: Energy (normalized 0-1, split into 4 bins for better resolution)
-            float energyNorm = norn.Energy / norn.MaxEnergy;
-            sensoryInputs[0] = energyNorm < 0.25f ? 1f : 0f; // Critical
-            sensoryInputs[1] = (energyNorm >= 0.25f && energyNorm < 0.5f) ? 1f : 0f; // Low
-            sensoryInputs[2] = (energyNorm >= 0.5f && energyNorm < 0.75f) ? 1f : 0f; // Medium
-            sensoryInputs[3] = energyNorm >= 0.75f ? 1f : 0f; // High
+            int bestAction = -1;
+            float bestActivation = actionThreshold;
             
-            // 4-7: Chemicals (hunger, fear, curiosity, reward)
-            if (chemicals != null)
+            // Check action neurons (8-15) first
+            for (int i = (int)OutputNeuron.Eat; i < outputSize; i++)
             {
-                sensoryInputs[4] = chemicals.GetLevel(ChemicalType.Hunger) / 100f;
-                sensoryInputs[5] = chemicals.GetLevel(ChemicalType.Fear) / 100f;
-                sensoryInputs[6] = chemicals.GetLevel(ChemicalType.Curiosity) / 100f;
-                sensoryInputs[7] = chemicals.GetLevel(ChemicalType.Reward) / 100f;
-            }
-            
-            // 8-15: Proximity sensors (8 directions)
-            UpdateProximitySensors();
-            
-            // 16-19: Nearest food
-            Vector3? nearestFood = FindNearestFood();
-            if (nearestFood.HasValue)
-            {
-                Vector3 dir = (nearestFood.Value - transform.position).normalized;
-                sensoryInputs[16] = dir.x; // Food X direction
-                sensoryInputs[17] = dir.z; // Food Z direction
-                float dist = Vector3.Distance(transform.position, nearestFood.Value);
-                sensoryInputs[18] = 1f / (1f + dist * 0.1f); // Food proximity (closer = higher)
-            }
-            else
-            {
-                sensoryInputs[16] = sensoryInputs[17] = sensoryInputs[18] = 0f;
-            }
-            sensoryInputs[19] = nearestFood.HasValue ? 1f : 0f; // Food exists
-            
-            // 20-22: Nearest creature (mate/rival)
-            // 23: Random noise (for exploration)
-            sensoryInputs[23] = Random.value;
-        }
-        
-        /// <summary>
-        /// Update 8-direction proximity sensors
-        /// </summary>
-        private void UpdateProximitySensors()
-        {
-            float sensorRange = 10f;
-            int layerMask = ~0; // All layers
-            
-            for (int i = 0; i < 8; i++)
-            {
-                float angle = i * 45f * Mathf.Deg2Rad;
-                Vector3 dir = new Vector3(Mathf.Sin(angle), 0, Mathf.Cos(angle));
-                
-                if (Physics.Raycast(transform.position + Vector3.up, dir, out RaycastHit hit, sensorRange, layerMask))
+                if (CurrentOutputs[i] > bestActivation)
                 {
-                    float proximity = 1f - (hit.distance / sensorRange);
-                    sensoryInputs[8 + i] = proximity;
-                }
-                else
-                {
-                    sensoryInputs[8 + i] = 0f;
-                }
-            }
-        }
-        
-        private Vector3? FindNearestFood()
-        {
-            // Use EcologyManager or direct search
-            Collider[] hits = Physics.OverlapSphere(transform.position, 20f);
-            Vector3? nearest = null;
-            float minDist = float.MaxValue;
-            
-            foreach (var hit in hits)
-            {
-                if (hit.CompareTag("Food"))
-                {
-                    float dist = Vector3.Distance(transform.position, hit.transform.position);
-                    if (dist < minDist)
-                    {
-                        minDist = dist;
-                        nearest = hit.transform.position;
-                    }
-                }
-            }
-            
-            return nearest;
-        }
-        
-        /// <summary>
-        /// Process neural outputs and decide action
-        /// </summary>
-        private void ProcessDecision()
-        {
-            float[] outputs = neuralNet.Forward(sensoryInputs);
-            
-            // Find highest output action
-            int bestAction = 0;
-            float bestValue = outputs[0];
-            
-            for (int i = 1; i < 16; i++)
-            {
-                if (outputs[i] > bestValue)
-                {
-                    bestValue = outputs[i];
+                    bestActivation = CurrentOutputs[i];
                     bestAction = i;
                 }
             }
             
-            // Only act if above threshold
-            if (bestValue < actionThreshold)
+            // Also consider movement as action if strong enough
+            if (bestAction < 0)
             {
-                hasTarget = false;
-                return;
+                for (int i = 0; i < (int)OutputNeuron.Eat; i++)
+                {
+                    if (CurrentOutputs[i] > bestActivation)
+                    {
+                        bestActivation = CurrentOutputs[i];
+                        bestAction = i;
+                    }
+                }
             }
             
-            // Execute action
-            ExecuteAction(bestAction, outputs);
+            return bestAction;
         }
-        
+
         /// <summary>
-        /// Map neural output to game action
+        /// Execute the currently selected action
         /// </summary>
-        private void ExecuteAction(int action, float[] outputs)
+        protected virtual void ExecuteAction()
+        {
+            // Determine action type from outputs
+            CreatureAction action;
+            OutputNeuron primaryNeuron;
+            
+            // Check for discrete actions first (Eat, Mate, Attack, Rest)
+            if (CurrentOutputs[(int)OutputNeuron.Eat] > actionThreshold && CanPerformAction(CreatureAction.Eat))
+            {
+                action = CreatureAction.Eat;
+                primaryNeuron = OutputNeuron.Eat;
+            }
+            else if (CurrentOutputs[(int)OutputNeuron.Mate] > actionThreshold && CanPerformAction(CreatureAction.Mate))
+            {
+                action = CreatureAction.Mate;
+                primaryNeuron = OutputNeuron.Mate;
+            }
+            else if (CurrentOutputs[(int)OutputNeuron.Attack] > actionThreshold && CanPerformAction(CreatureAction.Attack))
+            {
+                action = CreatureAction.Attack;
+                primaryNeuron = OutputNeuron.Attack;
+            }
+            else if (CurrentOutputs[(int)OutputNeuron.Rest] > actionThreshold && CanPerformAction(CreatureAction.Rest))
+            {
+                action = CreatureAction.Rest;
+                primaryNeuron = OutputNeuron.Rest;
+            }
+            else if (CurrentOutputs[(int)OutputNeuron.Flee] > actionThreshold)
+            {
+                action = CreatureAction.Flee;
+                primaryNeuron = OutputNeuron.Flee;
+            }
+            else
+            {
+                // Default to movement based on strongest movement neuron
+                action = CreatureAction.Move;
+                primaryNeuron = OutputNeuron.MoveForward;
+            }
+            
+            CurrentAction = action;
+            OnActionExecuted?.Invoke(action);
+            
+            // Execute the specific action logic
+            ExecuteMovement();
+            ExecuteDiscreteAction(action);
+        }
+
+        /// <summary>
+        /// Execute movement based on movement neuron outputs
+        /// </summary>
+        protected virtual void ExecuteMovement()
+        {
+            // Calculate movement vector from outputs 0-3
+            float forward = CurrentOutputs[(int)OutputNeuron.MoveForward];
+            float backward = CurrentOutputs[(int)OutputNeuron.MoveBackward];
+            float left = CurrentOutputs[(int)OutputNeuron.MoveLeft];
+            float right = CurrentOutputs[(int)OutputNeuron.MoveRight];
+            
+            // Apply threshold
+            if (Mathf.Abs(forward) < moveThreshold && Mathf.Abs(backward) < moveThreshold &&
+                Mathf.Abs(left) < moveThreshold && Mathf.Abs(right) < moveThreshold)
+            {
+                return; // No significant movement
+            }
+            
+            // Net movement
+            float moveZ = forward - backward;
+            float moveX = right - left;
+            
+            // Apply movement to transform
+            Vector3 moveDirection = new Vector3(moveX, 0, moveZ);
+            if (moveDirection.sqrMagnitude > 0.01f)
+            {
+                moveDirection.Normalize();
+                transform.position += moveDirection * Time.deltaTime * 2f;
+            }
+            
+            // Rotation from outputs 4-5
+            float turnLeft = CurrentOutputs[(int)OutputNeuron.TurnLeft];
+            float turnRight = CurrentOutputs[(int)OutputNeuron.TurnRight];
+            float rotation = (turnRight - turnLeft) * 90f * Time.deltaTime;
+            transform.Rotate(0, rotation, 0);
+        }
+
+        /// <summary>
+        /// Execute discrete actions (Eat, Mate, Attack, Rest, etc.)
+        /// </summary>
+        protected virtual void ExecuteDiscreteAction(CreatureAction action)
         {
             switch (action)
             {
-                case 0: // Move forward
-                    MoveDirection(transform.forward);
+                case CreatureAction.Eat:
+                    PerformEat();
                     break;
-                    
-                case 1: // Move backward
-                    MoveDirection(-transform.forward);
+                case CreatureAction.Mate:
+                    PerformMate();
                     break;
-                    
-                case 2: // Turn left
-                    Turn(-1);
+                case CreatureAction.Attack:
+                    PerformAttack();
                     break;
-                    
-                case 3: // Turn right
-                    Turn(1);
+                case CreatureAction.Rest:
+                    PerformRest();
                     break;
-                    
-                case 4: // Move to food
-                    Vector3? food = FindNearestFood();
-                    if (food.HasValue)
+                case CreatureAction.Flee:
+                    PerformFlee();
+                    break;
+            }
+        }
+
+        /// <summary>
+        /// Check if creature can perform this action
+        /// </summary>
+        protected virtual bool CanPerformAction(CreatureAction action)
+        {
+            if (Sensory == null) return false;
+            
+            return action switch
+            {
+                CreatureAction.Eat => Sensory.CanEat,
+                CreatureAction.Mate => Sensory.CanMate,
+                CreatureAction.Attack => Sensory.CanAttack,
+                CreatureAction.Rest => Sensory.CanRest,
+                _ => true
+            };
+        }
+
+        // Action implementations (override in derived classes or wire to other systems)
+        protected virtual void PerformEat() 
+        {
+            Debug.Log("[NeuralBrain] Executing: Eat");
+            // Will trigger reward through feedback
+        }
+        
+        protected virtual void PerformMate() 
+        {
+            Debug.Log("[NeuralBrain] Executing: Mate");
+        }
+        
+        protected virtual void PerformAttack() 
+        {
+            Debug.Log("[NeuralBrain] Executing: Attack");
+        }
+        protected virtual void PerformRest() 
+        {
+            Debug.Log("[NeuralBrain] Executing: Rest");
+        }
+        
+        protected virtual void PerformFlee()
+        {
+            Debug.Log("[NeuralBrain] Executing: Flee");
+            // Move away from threat
+        }
+
+        /// <summary>
+        /// Trigger reward signal - strengthens recent pathways
+        /// Call this when creature successfully eats, mates, finds food, etc.
+        /// </summary>
+        public void TriggerReward(float amount)
+        {
+            if (Learning == null || Memory == null || Memory.Count == 0) return;
+            
+            Learning.LearnFromMemory(Network, Memory, amount);
+            OnReward?.Invoke(amount);
+            
+            Debug.Log($"[NeuralBrain] Reward triggered: {amount:F3}");
+        }
+
+        /// <summary>
+        /// Trigger punishment signal - weakens recent pathways
+        /// Call this when creature takes damage, starves, hits wall, etc.
+        /// </summary>
+        public void TriggerPunishment(float amount)
+        {
+            if (Learning == null || Memory == null || Memory.Count == 0) return;
+            
+            Learning.LearnFromMemory(Network, Memory, -amount);
+            OnPunishment?.Invoke(-amount);
+            
+            Debug.Log($"[NeuralBrain] Punishment triggered: {amount:F3}");
+        }
+
+        /// <summary>
+        /// Save learned weights back to genome
+        /// Call before saving creature or reproduction
+        /// </summary>
+        public void SaveToGenome()
+        {
+            Network?.SaveWeightsToGenome();
+        }
+
+        /// <summary>
+        /// Get debug information
+        /// </summary>
+        public string GetDebugInfo()
+        {
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine($"=== NeuralBrain ===");
+            sb.AppendLine($"Current Action: {CurrentAction}");
+            sb.AppendLine($"Learning Rate: {Learning?.CurrentLearningRate:F4}");
+            
+            if (CurrentOutputs != null)
+            {
+                sb.AppendLine("Top Outputs:");
+                for (int i = 0; i < outputSize; i++)
+                {
+                    if (CurrentOutputs[i] > 0.3f)
                     {
-                        SetTarget(food.Value);
+                        sb.AppendLine($"  {(OutputNeuron)i}: {CurrentOutputs[i]:F2}");
                     }
-                    break;
-                    
-                case 5: // Eat (if food nearby)
-                    TryEat();
-                    break;
-                    
-                case 6: // Wait/rest
-                    hasTarget = false;
-                    if (agent != null) agent.isStopped = true;
-                    break;
-                    
-                case 7: // Explore (random direction)
-                    SetTarget(transform.position + Random.insideUnitSphere * 10f);
-                    break;
-                    
-                // Actions 8-15: Reserved for future use (mate, flee, etc.)
-                default:
-                    hasTarget = false;
-                    break;
-            }
-        }
-        
-        private void MoveDirection(Vector3 dir)
-        {
-            SetTarget(transform.position + dir * 5f);
-        }
-        
-        private void Turn(int direction)
-        {
-            transform.Rotate(0, turnSpeed * Time.deltaTime * direction, 0);
-        }
-        
-        private void SetTarget(Vector3 target)
-        {
-            targetPosition = target;
-            targetPosition.y = transform.position.y; // Keep on ground
-            hasTarget = true;
-            
-            if (agent != null && agent.isActiveAndEnabled)
-            {
-                agent.isStopped = false;
-                agent.SetDestination(targetPosition);
-            }
-        }
-        
-        private void ExecuteMovement()
-        {
-            if (!hasTarget || agent == null) return;
-            
-            // Check if reached target
-            if (!agent.pathPending && agent.remainingDistance < 0.5f)
-            {
-                hasTarget = false;
-                agent.isStopped = true;
-            }
-        }
-        
-        /// <summary>
-        /// Try to eat nearby food
-        /// </summary>
-        private void TryEat()
-        {
-            Collider[] hits = Physics.OverlapSphere(transform.position, 1.5f);
-            foreach (var hit in hits)
-            {
-                var food = hit.GetComponent<FoodSource>();
-                if (food != null && !food.IsConsumed)
-                {
-                    if (food.TryConsume(norn))
-                    {
-                        // Trigger learning reward
-                        neuralNet?.ApplyReward(1.0f);
-                    }
-                    break;
                 }
             }
-        }
-        
-        /// <summary>
-        /// Apply learning signals based on state changes
-        /// </summary>
-        private void ApplyLearningSignals()
-        {
-            if (neuralNet == null) return;
             
-            // Energy increased = reward
-            float energyDelta = norn.Energy - lastEnergy;
-            if (energyDelta > 0)
-            {
-                neuralNet.ApplyReward(energyDelta / norn.MaxEnergy);
-            }
-            else if (energyDelta < -0.5f) // Significant energy loss
-            {
-                neuralNet.ApplyPunishment(-energyDelta / norn.MaxEnergy);
-            }
-            lastEnergy = norn.Energy;
-            
-            // Chemical-based learning
-            if (chemicals != null)
-            {
-                // Reward for reward chemical
-                float rewardChem = chemicals.GetLevel(ChemicalType.Reward);
-                if (rewardChem > lastChemicals[2])
-                {
-                    neuralNet.ApplyReward((rewardChem - lastChemicals[2]) / 100f);
-                }
-                
-                // Punishment for pain
-                float pain = chemicals.GetLevel(ChemicalType.Pain);
-                if (pain > 50f)
-                {
-                    neuralNet.ApplyPunishment(pain / 100f);
-                }
-                
-                // Store current values
-                lastChemicals[2] = rewardChem;
-                lastChemicals[4] = pain;
-            }
-            
-            // Hebbian update
-            neuralNet.UpdateWeights();
+            sb.AppendLine($"Memory: {Memory?.GetDebugSummary() ?? "N/A"}");
+            return sb.ToString();
         }
-        
-        /// <summary>
-        /// Called when Norn takes damage
-        /// </summary>
-        public void OnDamageTaken(float amount)
-        {
-            neuralNet?.ApplyPunishment(amount / 100f);
-        }
-        
-        /// <summary>
-        /// Called when Norn successfuly mates
-        /// </summary>
-        public void OnReproductionSuccess()
-        {
-            neuralNet?.ApplyReward(0.5f);
-        }
-        
-        void OnDestroy()
-        {
-            // Cleanup
-        }
-        
-        // SCALES TO: Memory system, more complex actions, social behaviors
+    }
+
+    /// <summary>
+    /// Actions that can be performed by creatures
+    /// </summary>
+    public enum CreatureAction
+    {
+        Move,
+        Eat,
+        Mate,
+        Attack,
+        Rest,
+        Flee
     }
 }

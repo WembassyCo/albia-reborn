@@ -490,7 +490,7 @@ namespace Albia.Creatures
         #endregion
     }
     
-    /// <summary>
+    /// <summary>    
     /// Additional states for Grendel behavior
     /// </summary>
     public enum GrendelState

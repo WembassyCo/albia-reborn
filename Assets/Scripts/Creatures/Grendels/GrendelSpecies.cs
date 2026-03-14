@@ -38,12 +38,18 @@ namespace Albia.Creatures
         public float aggressionBase = 0.85f;
         
         [Tooltip("Speed gene multiplier range")]
-        [MinMaxRange(1f, 2f)]
-        public Vector2 speedGeneRange = new Vector2(1.2f, 1.5f);
+        [Range(1.2f, 2f)]
+        public float minSpeedGene = 1.2f;
+        
+        [Range(1.2f, 2f)]
+        public float maxSpeedGene = 1.5f;
         
         [Tooltip("Lifespan gene range")]
-        [MinMaxRange(30f, 120f)]
-        public Vector2 lifespanGeneRange = new Vector2(60f, 100f);
+        [Range(30f, 120f)]
+        public float minLifespanGene = 60f;
+        
+        [Range(30f, 150f)]
+        public float maxLifespanGene = 100f;
         
         [Tooltip("Cannibalism enabled")]
         public bool enableCannibalism = true;
@@ -91,54 +97,46 @@ namespace Albia.Creatures
         public GenomeData GenerateGenome(int seed = 0)
         {
             var random = new System.Random(seed != 0 ? seed : Environment.TickCount);
-            var genome = new GenomeData();
+            var genes = new float[192]; // Using standard genome size
             
             // Initialize with random values
-            var genes = new float[GenomeData.TotalGenes];
-            for (int i = 0; i < GenomeData.TotalGenes; i++)
+            for (int i = 0; i < genes.Length; i++)
             {
                 genes[i] = (float)(random.NextDouble() * 2.0 - 1.0); // -1 to 1
             }
             
-            // Apply Grendel-specific trait genes (first 64 are physical/biochemical)
-            
-            // Gene 0-9: Physical/biochemical base
-            // Index 9 is specifically aggression
-            
+            // Apply Grendel-specific trait genes
             // Aggression: 0.7 - 1.0 range (high aggression)
-            // Map -1..1 to 0.7..1.0
-            genes[9] = aggressionBase * 2 - 1; // Convert 0.85 to ~0.7 in -1..1 space
+            genes[9] = aggressionBase * 2 - 1;
             
-            // Speed gene (affects movement speed)
-            // Store as normalized multiplier
-            float speedGene = UnityEngine.Random.Range(speedGeneRange.x, speedGeneRange.y);
-            genes[10] = (speedGene - 1f) * 2; // Map 1.0..2.0 to -1..1
+            // Speed gene
+            float speedGene = UnityEngine.Random.Range(minSpeedGene, maxSpeedGene);
+            genes[10] = (speedGene - 1f) * 2;
             
             // Lifespan gene
-            float lifespanGene = UnityEngine.Random.Range(lifespanGeneRange.x, lifespanGeneRange.y);
-            genes[11] = (lifespanGene - 60f) / 60f * 2 - 1; // Map to -1..1
+            float lifespanGene = UnityEngine.Random.Range(minLifespanGene, maxLifespanGene);
+            genes[11] = (lifespanGene - 60f) / 60f * 2 - 1;
             
             // Damage gene
             float damageGene = UnityEngine.Random.Range(0.8f, 1.2f);
             genes[12] = damageGene * 2 - 1;
             
-            // Metabolism efficiency (0.8 - 1.2 scale)
+            // Metabolism efficiency
             float metabolismGene = UnityEngine.Random.Range(0.8f, 1.2f);
             genes[13] = metabolismGene * 2 - 1;
             
-            // Detection gene (affects detection radius)
+            // Detection gene
             float detectionGene = UnityEngine.Random.Range(0.8f, 1.2f);
             genes[14] = detectionGene * 2 - 1;
             
-            // Cannibalism trait (stored as separate boolean-ish gene)
+            // Cannibalism trait
             genes[15] = enableCannibalism ? 0.5f : -0.5f;
             
-            // Species marker genes (224-255)
-            // Use 224-227 to mark as Grendel species
-            genes[224] = 0.9f; // Grendel marker 1
-            genes[225] = -0.9f; // Grendel marker 2
-            genes[226] = 0.5f; // Grendel marker 3
-            genes[227] = -0.5f; // Grendel marker 4
+            // Species markers
+            genes[100] = 0.9f;
+            genes[101] = -0.9f;
+            genes[102] = 0.5f;
+            genes[103] = -0.5f;
             
             return new GenomeData(genes);
         }
@@ -186,42 +184,44 @@ namespace Albia.Creatures
         {
             if (grendel == null) return;
             
-            // Use reflection to set private fields
             var type = typeof(Grendel);
+            var bindingFlags = System.Reflection.BindingFlags.NonPublic | 
+                              System.Reflection.BindingFlags.Public | 
+                              System.Reflection.BindingFlags.Instance;
             
-            // Set serialized fields
-            SetPrivateField(grendel, "attackRange", attackRange, type);
-            SetPrivateField(grendel, "attackDamage", attackDamage, type);
-            SetPrivateField(grendel, "attackCooldown", attackCooldown, type);
-            SetPrivateField(grendel, "nornDetectionRadius", detectionRadius, type);
-            SetPrivateField(grendel, "speedMultiplier", baseSpeed * UnityEngine.Random.Range(speedGeneRange.x, speedGeneRange.y) / 1.4f, type);
-            SetPrivateField(grendel, "maxLifespan", UnityEngine.Random.Range(lifespanGeneRange.x, lifespanGeneRange.y), type);
-            SetPrivateField(grendel, "cannibalismThreshold", cannibalismThreshold, type);
-            SetPrivateField(grendel, "aggressionLevel", aggressionBase, type);
-            SetPrivateField(grendel, "enableCannibalism", enableCannibalism, type);
+            // Set serialized fields via reflection
+            SetFieldValue(grendel, "attackRange", attackRange, type, bindingFlags);
+            SetFieldValue(grendel, "attackDamage", attackDamage, type, bindingFlags);
+            SetFieldValue(grendel, "attackCooldown", attackCooldown, type, bindingFlags);
+            SetFieldValue(grendel, "nornDetectionRadius", detectionRadius, type, bindingFlags);
+            SetFieldValue(grendel, "speedMultiplier", baseSpeed * UnityEngine.Random.Range(minSpeedGene, maxSpeedGene) / 1.4f, type, bindingFlags);
+            SetFieldValue(grendel, "maxLifespan", UnityEngine.Random.Range(minLifespanGene, maxLifespanGene), type, bindingFlags);
+            SetFieldValue(grendel, "cannibalismThreshold", cannibalismThreshold, type, bindingFlags);
+            SetFieldValue(grendel, "aggressionLevel", aggressionBase, type, bindingFlags);
+            SetFieldValue(grendel, "enableCannibalism", enableCannibalism, type, bindingFlags);
             
-            // Apply initial stats
-            var energyField = typeof(Organism).GetField("currentEnergy", 
-                System.Reflection.BindingFlags.NonPublic | 
-                System.Reflection.BindingFlags.Instance);
-            var maxEnergyField = typeof(Organism).GetField("maxEnergy", 
-                System.Reflection.BindingFlags.NonPublic | 
-                System.Reflection.BindingFlags.Instance);
+            // Initialize energy
+            InitializeGrendelEnergy(grendel);
+        }
+        
+        private void InitializeGrendelEnergy(Grendel grendel)
+        {
+            var organismType = typeof(Organism);
+            var bindingFlags = System.Reflection.BindingFlags.NonPublic | 
+                              System.Reflection.BindingFlags.Instance;
+            
+            var maxEnergyField = organismType.GetField("maxEnergy", bindingFlags);
+            var currentEnergyField = organismType.GetField("currentEnergy", bindingFlags);
             
             if (maxEnergyField != null)
                 maxEnergyField.SetValue(grendel, baseMaxEnergy);
-            if (energyField != null)
-                energyField.SetValue(grendel, baseMaxEnergy * 0.8f); // Start at 80% energy
+            if (currentEnergyField != null)
+                currentEnergyField.SetValue(grendel, baseMaxEnergy * 0.8f);
         }
         
-        private void SetPrivateField(object target, string fieldName, object value, System.Type type = null)
+        private void SetFieldValue(object target, string fieldName, object value, System.Type type, System.Reflection.BindingFlags flags)
         {
-            var t = type ?? target.GetType();
-            var field = t.GetField(fieldName, 
-                System.Reflection.BindingFlags.NonPublic | 
-                System.Reflection.BindingFlags.Instance | 
-                System.Reflection.BindingFlags.Public);
-            
+            var field = type.GetField(fieldName, flags);
             if (field != null)
             {
                 field.SetValue(target, value);
@@ -230,7 +230,6 @@ namespace Albia.Creatures
         
         private void CreateVisuals(GameObject grendelObj)
         {
-            // Create a simple visual representation
             // Body
             var body = GameObject.CreatePrimitive(PrimitiveType.Capsule);
             body.name = "Body";
@@ -239,7 +238,6 @@ namespace Albia.Creatures
             body.transform.localScale = Vector3.one * sizeMultiplier;
             body.transform.localRotation = Quaternion.identity;
             
-            // Apply body color
             var bodyRenderer = body.GetComponent<Renderer>();
             if (bodyRenderer != null)
             {
@@ -247,10 +245,9 @@ namespace Albia.Creatures
                 bodyRenderer.material.color = bodyColor;
             }
             
-            // Destroy collider from visual (we have our own)
             Destroy(body.GetComponent<Collider>());
             
-            // Eyes (2 small spheres)
+            // Eyes
             CreateEye(grendelObj, new Vector3(-0.15f, 1.5f, 0.35f) * sizeMultiplier);
             CreateEye(grendelObj, new Vector3(0.15f, 1.5f, 0.35f) * sizeMultiplier);
         }
@@ -268,26 +265,9 @@ namespace Albia.Creatures
             {
                 eyeRenderer.material = new Material(Shader.Find("Standard"));
                 eyeRenderer.material.color = eyeColor;
-                eyeRenderer.material.SetFloat("_Emission", 0.5f); // Slight glow
             }
             
             Destroy(eye.GetComponent<Collider>());
-        }
-    }
-    
-    /// <summary>    
-    /// Attribute for Min/Max range in inspector
-    /// </summary>
-    [AttributeUsage(AttributeTargets.Field)]
-    public class MinMaxRangeAttribute : PropertyAttribute
-    {
-        public float Min { get; }
-        public float Max { get; }
-        
-        public MinMaxRangeAttribute(float min, float max)
-        {
-            Min = min;
-            Max = max;
         }
     }
 }

@@ -42,7 +42,8 @@ namespace Albia.AI
 
         [Header("State References")]
         [Tooltip("Reference to creature state for energy/hunger/etc")]
-        [SerializeField] private CreatureState creatureState;
+        [SerializeField] 
+        internal CreatureState creatureState;
 
         // Cached raycast results
         private RaycastHit[] visionHits;
@@ -62,10 +63,10 @@ namespace Albia.AI
         #region Sensory Properties
         
         // Chemical/Internal State (6 outputs)
-        public float Hunger >> creatureState?.Hunger ?? 0f;
-        public float Energy >> creatureState?.Energy ?? 1f;
+        public float Hunger => creatureState?.Hunger ?? 0f;
+        public float Energy => creatureState?.Energy ?? 1f;
         public float Fear { get; private set; }
-        public float Pain >> 1f - (creatureState?.Health ?? 1f);
+        public float Pain => 1f - (creatureState?.Health ?? 1f);
         public float Curiosity { get; private set; }
         public float Comfort { get; private set; }
         
@@ -89,15 +90,15 @@ namespace Albia.AI
         public bool ObstacleDetected { get; private set; }
         
         // Context/State (8 outputs)
-        public bool CanEat >> Hunger > 0.3f && CanSeeFood;
-        public bool CanMate >> Energy > 0.7f && AgeNormalized > 0.1f;
-        public bool CanAttack >> Energy > 0.3f;
-        public bool CanRest >> Energy < 1f;
+        public bool CanEat => Hunger > 0.3f && CanSeeFood;
+        public bool CanMate => Energy > 0.7f && AgeNormalized > 0.1f;
+        public bool CanAttack => Energy > 0.3f;
+        public bool CanRest => Energy < 1f;
         
-        public float TimeSinceLastAction >> 1f - Mathf.Exp(-timeSinceLastAction * 0.1f);
+        public float TimeSinceLastAction => 1f - Mathf.Exp(-timeSinceLastAction * 0.1f);
         public int NearbyCreaturesCount { get; private set; }
-        public float Health >> creatureState?.Health ?? 1f;
-        public float AgeNormalized >> creatureState?.NormalizedAge ?? 0f;
+        public float Health => creatureState?.Health ?? 1f;
+        public float AgeNormalized => creatureState?.NormalizedAge ?? 0f;
         
         #endregion
 
