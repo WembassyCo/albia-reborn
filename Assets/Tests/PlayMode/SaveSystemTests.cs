@@ -8,7 +8,7 @@ using Albia.Systems.SaveSystem;
 using Albia.Creatures;
 using Albia.Creatures.Neural;
 
-namespace AlbiaReborn.Tests.PlayMode
+namespace Albia.Tests.PlayMode
 {
     /// <summary>
     /// PlayMode tests for the Save/Load system.

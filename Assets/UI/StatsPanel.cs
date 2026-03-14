@@ -2,7 +2,7 @@ using UnityEngine;
 using TMPro;
 using System.Collections.Generic;
 using Albia.Creatures;
-using AlbiaReborn.Climate;
+using Albia.Climate;
 
 namespace Albia.UI
 {

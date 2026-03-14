@@ -1,8 +1,8 @@
 using UnityEngine;
-using AlbiaReborn.Core.Interfaces;
-using AlbiaReborn.World.Voxel;
+using Albia.Core.Interfaces;
+using Albia.World.Voxel;
 
-namespace AlbiaReborn.Creatures.Ecology
+namespace Albia.Creatures.Ecology
 {
     /// <summary>
     /// Plant organism - producer in food chain.

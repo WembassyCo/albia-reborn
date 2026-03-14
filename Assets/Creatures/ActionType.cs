@@ -1,4 +1,4 @@
-namespace AlbiaReborn.Creatures
+namespace Albia.Creatures
 {
     /// <summary>
     /// All possible creature actions.

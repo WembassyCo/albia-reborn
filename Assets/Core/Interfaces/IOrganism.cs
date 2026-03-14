@@ -1,7 +1,7 @@
 using UnityEngine;
 using System;
 
-namespace AlbiaReborn.Core.Interfaces
+namespace Albia.Core.Interfaces
 {
     /// <summary>
     /// Interface for biological organisms in the ecosystem.

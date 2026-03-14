@@ -1,7 +1,7 @@
 using UnityEngine;
 using System.Collections.Generic;
 
-namespace AlbiaReborn.Core.Interfaces
+namespace Albia.Core.Interfaces
 {
     /// <summary>
     /// Interface for UI inspection panels that display entity data.

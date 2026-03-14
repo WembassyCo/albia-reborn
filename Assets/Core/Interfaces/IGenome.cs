@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace AlbiaReborn.Core.Interfaces
+namespace Albia.Core.Interfaces
 {
     /// <summary>
     /// Interface for genetic/genomic data representation.

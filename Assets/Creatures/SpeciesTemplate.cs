@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace AlbiaReborn.Creatures.Genetics
+namespace Albia.Creatures.Genetics
 {
     /// <summary>
     /// ScriptableObject defining species characteristics.
