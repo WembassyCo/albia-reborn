@@ -1,0 +1,191 @@
+name: Albia Reborn CI/CD
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+env:
+  UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+  UNITY_VERSION: 6000.0.37f1
+
+jobs:
+  test-editmode:
+    name: Edit Mode Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Cache Library
+        uses: actions/cache@v4
+        with:
+          path: Library
+          key: Library-${{ runner.os }}-${{ hashFiles('Packages/manifest.json') }}
+          restore-keys: |
+            Library-${{ runner.os }}-
+
+      - name: Run Edit Mode Tests
+        uses: game-ci/unity-test-runner@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          unityVersion: ${{ env.UNITY_VERSION }}
+          testMode: EditMode
+          githubToken: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Test Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: EditMode Test Results
+          path: artifacts
+
+  test-playmode:
+    name: Play Mode Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Cache Library
+        uses: actions/cache@v4
+        with:
+          path: Library
+          key: Library-${{ runner.os }}-${{ hashFiles('Packages/manifest.json') }}
+          restore-keys: |
+            Library-${{ runner.os }}-
+
+      - name: Run Play Mode Tests
+        uses: game-ci/unity-test-runner@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          unityVersion: ${{ env.UNITY_VERSION }}
+          testMode: PlayMode
+          githubToken: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Test Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: PlayMode Test Results
+          path: artifacts
+
+  build-windows:
+    name: Build for Windows
+    runs-on: ubuntu-latest
+    needs: [test-editmode, test-playmode]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Cache Library
+        uses: actions/cache@v4
+        with:
+          path: Library
+          key: Library-${{ runner.os }}-${{ hashFiles('Packages/manifest.json') }}
+          restore-keys: |
+            Library-${{ runner.os }}-
+
+      - name: Build Windows x64
+        uses: game-ci/unity-builder@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          targetPlatform: StandaloneWindows64
+          unityVersion: ${{ env.UNITY_VERSION }}
+          buildName: AlbiaReborn-Windows-x64
+          buildsPath: artifacts
+
+      - name: Upload Windows Build
+        uses: actions/upload-artifact@v4
+        with:
+          name: AlbiaReborn-Windows-x64
+          path: artifacts/StandaloneWindows64
+
+  build-macos-intel:
+    name: Build for macOS (Intel)
+    runs-on: ubuntu-latest
+    needs: [test-editmode, test-playmode]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Cache Library
+        uses: actions/cache@v4
+        with:
+          path: Library
+          key: Library-${{ runner.os }}-${{ hashFiles('Packages/manifest.json') }}
+          restore-keys: |
+            Library-${{ runner.os }}-
+
+      - name: Build macOS Intel
+        uses: game-ci/unity-builder@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          targetPlatform: StandaloneOSX
+          unityVersion: ${{ env.UNITY_VERSION }}
+          buildName: AlbiaReborn-macOS-x64
+          buildsPath: artifacts
+
+      - name: Upload macOS Intel Build
+        uses: actions/upload-artifact@v4
+        with:
+          name: AlbiaReborn-macOS-x64
+          path: artifacts/StandaloneOSX
+
+  build-linux:
+    name: Build for Linux
+    runs-on: ubuntu-latest
+    needs: [test-editmode, test-playmode]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Cache Library
+        uses: actions/cache@v4
+        with:
+          path: Library
+          key: Library-${{ runner.os }}-${{ hashFiles('Packages/manifest.json') }}
+          restore-keys: |
+            Library-${{ runner.os }}-
+
+      - name: Build Linux x64
+        uses: game-ci/unity-builder@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          targetPlatform: StandaloneLinux64
+          unityVersion: ${{ env.UNITY_VERSION }}
+          buildName: AlbiaReborn-Linux-x64
+          buildsPath: artifacts
+
+      - name: Upload Linux Build
+        uses: actions/upload-artifact@v4
+        with:
+          name: AlbiaReborn-Linux-x64
+          path: artifacts/StandaloneLinux64
