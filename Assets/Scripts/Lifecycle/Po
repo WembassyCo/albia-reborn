@@ -1,0 +1,101 @@
+using UnityEngine;
+using Albia.Core;
+using Albia.Creatures;
+using System;
+using System.Collections.Generic;
+
+namespace Albia.Lifecycle
+{
+    /// <summary>
+    /// Tracks all living organisms and population statistics.
+    /// MVP: Basic tracking
+    /// Full: Extinction events, migration, population graphs
+    /// </summary>
+    public class PopulationRegistry : MonoBehaviour
+    {
+        public static PopulationRegistry Instance { get; private set; }
+
+        [Header("Population Tracking")]
+        [SerializeField] private List<Organism> allNorns = new List<Organism>();
+        
+        // Events
+        public event Action<Organism> OnOrganismRegistered;
+        public event Action<Organism> OnOrganismDeregistered;
+        public event Action<Organism> OnOrganismDeath;
+        public event Action OnPopulationChanged;
+
+        void Awake()
+        {
+            Instance = this;
+        }
+
+        /// <summary>
+        /// Register a new organism
+        /// </summary>
+        public void RegisterOrganism(Organism organism)
+        {
+            if (!allNorns.Contains(organism))
+            {
+                allNorns.Add(organism);
+                organism.OnDeath += OnOrganismDied;
+                OnOrganismRegistered?.Invoke(organism);
+                OnPopulationChanged?.Invoke();
+            }
+        }
+
+        /// <summary>
+        /// Deregister an organism (cleanup)
+        /// </summary>
+        public void DeregisterOrganism(Organism organism)
+        {
+            if (allNorns.Contains(organism))
+            {
+                allNorns.Remove(organism);
+                organism.OnDeath -= OnOrganismDied;
+                OnOrganismDeregistered?.Invoke(organism);
+                OnPopulationChanged?.Invoke();
+            }
+        }
+
+        private void OnOrganismDied(Organism organism)
+        {
+            OnOrganismDeath?.Invoke(organism);
+            OnPopulationChanged?.Invoke();
+        }
+
+        /// <summary>
+        /// Get all living Norns
+        /// </summary>
+        public List<Organism> GetAllNorns()
+        {
+            // Clean dead organisms
+            allNorns.RemoveAll(org => org == null || !org.IsAlive);
+            return new List<Organism>(allNorns);
+        }
+
+        /// <summary>
+        /// Get population count
+        /// </summary>
+        public int GetPopulationCount()
+        {
+            return GetAllNorns().Count;
+        }
+
+        /// <summary>
+        /// Get Norns in area
+        /// SCALES TO: Spatial partitioning
+        /// </summary>
+        public List<Organism> GetNornsInArea(Vector3 center, float radius)
+        {
+            var result = new List<Organism>();
+            foreach (var norn in GetAllNorns())
+            {
+                if (Vector3.Distance(center, norn.transform.position) <= radius)
+                {
+                    result.Add(norn);
+                }
+            }
+            return result;
+        }
+    }
+}

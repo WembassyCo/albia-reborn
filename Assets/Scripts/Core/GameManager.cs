@@ -1,40 +1,36 @@
 using UnityEngine;
-using AlbiaReborn.World.Generation;
-using AlbiaReborn.World.Voxel;
-using AlbiaReborn.World.Climate;
-using AlbiaReborn.World.Rendering;
-using AlbiaReborn.Core.Persistence;
+using UnityEngine.SceneManagement;
 
-namespace AlbiaReborn.Core
+namespace Albia.Core
 {
     /// <summary>
-    /// Bootstrap and lifecycle manager for Albia Reborn.
-    /// Coordinates world generation, rendering, and save/load.
+    /// GameManager singleton - boots the simulation.
+    /// MVP: Basic initialization
+    /// Full: World generation, ecology seeding, historical sim
     /// </summary>
     public class GameManager : MonoBehaviour
     {
-        [Header("World Settings")]
-        public int Seed = 1337;
-        public int WorldWidth = 128;
-        public int WorldHeight = 128;
-        public bool AutoGenerateOnStart = true;
-
-        [Header("Rendering")]
-        public Material DirtMaterial;
-        public Material StoneMaterial;
-        public Material GrassMaterial;
-        public Material SandMaterial;
-
-        // Core systems
-        private HeightmapGenerator _heightmap;
-        private ChunkManager _chunks;
-        private ClimateSystem _climate;
-        private SaveManager _saves;
-        private ChunkRenderer _renderer;
-
         public static GameManager Instance { get; private set; }
+        
+        [Header("World Settings")]
+        [SerializeField] private int worldSeed = 0;
+        [SerializeField] private bool randomizeSeed = true;
+        
+        [Header("Spawning")]
+        [SerializeField] private GameObject nornPrefab;
+        [SerializeField] private GameObject foodPrefab;
+        [SerializeField] private Transform spawnParent;
+        
+        [Header("MVP Test Settings")]
+        [SerializeField] private int initialNornCount = 3;
+        [SerializeField] private int initialFoodCount = 10;
+        [SerializeField] private float foodRespawnInterval = 30f;
 
-        void Awake()
+        // References
+        public TimeManager TimeManager { get; private set; }
+        // SCALES TO: WorldGenerator, TerrainManager, EcologySystem, PopulationRegistry
+
+        private void Awake()
         {
             if (Instance != null)
             {
@@ -43,90 +39,114 @@ namespace AlbiaReborn.Core
             }
             Instance = this;
             DontDestroyOnLoad(gameObject);
+
+            // Seed setup
+            if (randomizeSeed)
+                worldSeed = Random.Range(int.MinValue, int.MaxValue);
+            Random.InitState(worldSeed);
+            
+            Debug.Log($"[GameManager] World seeded: {worldSeed}");
         }
 
-        void Start()
+        private void Start()
         {
-            _saves = new SaveManager();
+            // Bootstrap systems
+            BootstrapSystems();
             
-            if (AutoGenerateOnStart)
+            // Spawn initial world state
+            SpawnInitialPopulation();
+            SpawnFood();
+
+            // Start food respawn
+            InvokeRepeating(nameof(SpawnFood), foodRespawnInterval, foodRespawnInterval);
+        }
+
+        private void BootstrapSystems()
+        {
+            // Time manager
+            TimeManager = FindFirstObjectByType<TimeManager>();
+            if (TimeManager == null)
             {
-                GenerateNewWorld(Seed);
+                var timeGO = new GameObject("TimeManager");
+                TimeManager = timeGO.AddComponent<TimeManager>();
+            }
+
+            // SCALES TO:
+            // - WorldGeneration (terrain)
+            // - ClimateSystem (temperature, moisture)
+            // - WeatherSystem (rain, sun)
+            // - EcologySystem (plants, insects, fauna)
+            // - PopulationRegistry (tracking all organisms)
+            // - EventBus (decoupled system communication)
+        }
+
+        private void SpawnInitialPopulation()
+        {
+            if (nornPrefab == null)
+            {
+                Debug.LogError("[GameManager] Norn prefab not assigned!");
+                return;
+            }
+
+            for (int i = 0; i < initialNornCount; i++)
+            {
+                Vector3 spawnPos = GetRandomWalkablePosition();
+                var norn = Instantiate(nornPrefab, spawnPos, Quaternion.identity, spawnParent);
+                norn.name = $"Norn_{i + 1}";
+                
+                // SCALES TO: PopulationRegistry.Register(norn)
             }
         }
 
-        /// <summary>
-        /// Generates a complete new world from seed.
-        /// </summary>
-        public void GenerateNewWorld(int seed)
+        private void SpawnFood()
         {
-            Debug.Log($"Generating world with seed: {seed}");
-            Seed = seed;
+            if (foodPrefab == null) return;
 
-            // Phase 1: Generate heightmap
-            _heightmap = new HeightmapGenerator(seed, WorldWidth, WorldHeight);
-            Debug.Log($"Heightmap generated: {_heightmap.Width}x{_heightmap.Height}");
+            // Count existing food
+            int currentFood = GameObject.FindGameObjectsWithTag("Food").Length;
+            int toSpawn = initialFoodCount - currentFood;
 
-            // Phase 2: Create voxel chunks
-            _chunks = new ChunkManager(_heightmap);
-            Debug.Log($"Chunks created: {_heightmap.Width / ChunkManager.ChunkSize}x{_heightmap.Height / ChunkManager.ChunkSize}");
-
-            // Phase 3: Climate/biome assignment
-            _climate = new ClimateSystem(_heightmap);
-
-            // Phase 4: Render meshes
-            SetupRenderer();
-
-            Debug.Log("World generation complete!");
-        }
-
-        private void SetupRenderer()
-        {
-            // Create renderer GameObject
-            GameObject rendererObj = new GameObject("WorldRenderer");
-            rendererObj.transform.parent = transform;
-            
-            _renderer = rendererObj.AddComponent<ChunkRenderer>();
-            _renderer.Initialize(_chunks, _climate, _heightmap);
-            
-            // Assign materials
-            _renderer.DirtMaterial = DirtMaterial;
-            _renderer.StoneMaterial = StoneMaterial;
-            _renderer.GrassMaterial = GrassMaterial;
-            _renderer.SandMaterial = SandMaterial;
-            
-            _renderer.GenerateAllChunkMeshes();
-        }
-
-        /// <summary>
-        /// Save current world to disk.
-        /// </summary>
-        public async void SaveWorld(string saveName)
-        {
-            if (_heightmap == null) return;
-            
-            var data = new WorldData(Seed, _heightmap.Width, _heightmap.Height, _heightmap.GetHeightmap());
-            await _saves.SaveWorldAsync(saveName, data);
-        }
-
-        /// <summary>
-        /// Load world from saved file.
-        /// </summary>
-        public async void LoadWorld(string fileName)
-        {
-            var data = await _saves.LoadWorldAsync(fileName);
-            if (data != null)
+            for (int i = 0; i < toSpawn; i++)
             {
-                Seed = data.Seed;
-                // Rebuild world from saved heightmap
-                GenerateNewWorld(data.Seed);
+                Vector3 spawnPos = GetRandomWalkablePosition();
+                var food = Instantiate(foodPrefab, spawnPos, Quaternion.identity, spawnParent);
+                
+                // SCALES TO: Biome-aware food spawning based on terrain
             }
         }
 
-        void OnDestroy()
+        private Vector3 GetRandomWalkablePosition()
         {
-            if (Instance == this)
-                Instance = null;
+            // MVP: Random position on flat plane
+            // Full: NavMesh.SamplePosition on terrain
+            
+            Vector3 randomPos = new Vector3(
+                Random.Range(-50f, 50f),
+                0.5f,
+                Random.Range(-50f, 50f)
+            );
+            
+            // SCALES TO: NavMesh.SamplePosition validation
+            return randomPos;
         }
+
+        public void PauseGame()
+        {
+            Time.timeScale = 0f;
+        }
+
+        public void ResumeGame()
+        {
+            Time.timeScale = 1f;
+        }
+
+        public void RestartGame()
+        {
+            SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+        }
+
+        // SCALES TO: Save/Load
+        // public void SaveWorld(string filename) { }
+        // public void LoadWorld(string filename) { }
     }
 }

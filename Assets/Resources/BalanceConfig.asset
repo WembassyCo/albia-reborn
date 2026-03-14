@@ -1,0 +1,47 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_PrefabParentObject: {fileID: 0}
+  m_PrefabInternal: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: balance-config-placeholder, type: 3}
+  m_Name: BalanceConfig
+  m_EditorClassIdentifier: Albia.Core.BalanceConfig
+  
+  # Norn Settings
+  nornInitialEnergy: 80
+  nornMaxEnergy: 100
+  nornMetabolism: 0.1
+  nornHungerThreshold: 60
+  nornMoveCost: 0.05
+  nornLifespan: 600
+  nornAdultAge: 100
+  nornElderAge: 400
+  
+  # Reproduction Settings
+  reproductionCost: 30
+  reproductionThreshold: 70
+  reproductionCooldown: 120
+  pregnancyDuration: 60
+  mutationRate: 0.02
+  mutationStrength: 0.1
+  
+  # Food Settings
+  foodNutrition: 25
+  foodRespawnTime: 30
+  maxFoodCount: 50
+  foodSpawnInterval: 10
+  
+  # Neural Settings
+  neuralLearningRate: 0.001
+  neuralDecisionInterval: 0.1
+  neuralActionThreshold: 0.3
+  
+  # World Settings
+  worldSize: 100
+  maxCreatures: 20
+  dayLength: 300

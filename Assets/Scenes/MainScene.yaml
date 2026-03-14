@@ -1,0 +1,98 @@
+%YAML 1.1
+---
+gameObject:
+  name: GameManager
+  components:
+    - type: GameManager
+      properties:
+        nornPrefab: {fileID: 100000, guid: 00000000000000000000000000000000}
+        foodPrefab: {fileID: 100001, guid: 00000000000000000000000000000000}
+        spawnParent: {fileID: 0}
+        initialNornCount: 3
+        initialFoodCount: 10
+        foodRespawnInterval: 30
+    - type: TimeManager
+      properties:
+        timeScale: 60
+---
+gameObject:
+  name: "Terrain/World"
+  components:
+    - type: AlbiaReborn.Pods.Terrain.ChunkManager
+      properties:
+        terrainMaterial: {fileID: 2100000, guid: 00000000000000000000000000000000}
+---
+gameObject:
+  name: MainCamera
+  tag: MainCamera
+  components:
+    - type: Camera
+      properties:
+        clearFlags: 2
+        backgroundColor: {r: 0.2, g: 0.3, b: 0.5, a: 1}
+        fieldOfView: 60
+        nearClipPlane: 0.3
+        farClipPlane: 1000
+    - type: Albia.Player.ObserverCamera
+    - type: Albia.Player.InteractionController
+      properties:
+        playerCamera: {fileID: 0}
+        selectableLayers:
+          serializedVersion: 2
+          m_Bits: 4294967295
+  transform:
+    position: {x: 0, y: 10, z: -10}
+    rotation: {x: 0.2588191, y: 0, z: 0, w: 0.9659258}
+    localScale: {x: 1, y: 1, z: 1}
+---
+gameObject:
+  name: DirectionalLight
+  components:
+    - type: Light
+      properties:
+        type: 1
+        color: {r: 1, g: 0.97, b: 0.87, a: 1}
+        intensity: 1
+  transform:
+    rotation: {x: 0.5, y: -0.3, z: 0, w: 0.8}
+---
+gameObject:
+  name: "UI/Canvas"
+  components:
+    - type: Canvas
+      properties:
+        renderMode: 0
+        referenceResolution: {x: 1920, y: 1080}
+---
+gameObject:
+  name: UI/CreatureInspector
+  parent: Canvas
+  components:
+    - type: Albia.UI.CreatureInspectorUI
+---
+gameObject:
+  name: UI/StatsPanel
+  parent: Canvas
+  components:
+    - type: Albia.UI.StatsPanel
+---
+gameObject:
+  name: UI/TimeControls
+  parent: Canvas
+  components:
+    - type: Albia.UI.TimeControls
+---
+gameObject:
+  name: PopulationRegistry
+  components:
+    - type: Albia.Lifecycle.PopulationRegistry
+---
+gameObject:
+  name: EcologyManager
+  components:
+    - type: Albia.Ecology.EcologyManager
+      properties:
+        foodPrefab: {fileID: 100001, guid: 00000000000000000000000000000000}
+        maxFoodCount: 50
+        spawnInterval: 10
+        spawnRadius: 40

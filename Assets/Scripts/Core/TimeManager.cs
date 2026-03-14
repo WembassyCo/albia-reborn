@@ -1,128 +1,121 @@
 using UnityEngine;
 using System;
 
-namespace AlbiaReborn.Core
+namespace Albia.Core
 {
     /// <summary>
     /// Master time simulation.
-    /// Tracks orbital position, day angle, moon phase.
-    /// Single source of truth for all time-dependent systems.
+    /// MVP: Basic time scaling
+    /// Full: Orbital mechanics, seasons, day/night, tides
     /// </summary>
     public class TimeManager : MonoBehaviour
     {
         public static TimeManager Instance { get; private set; }
 
         [Header("Time Scale")]
-        public float TimeScale = 60f; // 1 real second = 1 game minute
-        public float MinTimeScale = 0.5f;
-        public float MaxTimeScale = 100f;
+        [SerializeField] private float timeScale = 60f; // 1 real sec = 1 game minute
+        [SerializeField] private float minTimeScale = 0f;
+        [SerializeField] private float maxTimeScale = 300f;
 
-        [Header("World Parameters")]
-        public float AxialTilt = 23.5f; // degrees
-        public float OrbitalPeriod = 365f; // game days per year
-        public float LunarPeriod = 30f; // game days per lunar cycle
+        [Header("Time Tracking")]
+        [SerializeField] private int gameDay = 1;
+        [SerializeField] private float dayTime = 0f; // 0-24 hours
+        
+        // Public data
+        public float TotalGameTime { get; private set; } = 0f;
+        public int GameDay => gameDay;
+        public float DayTime => dayTime; // 0-24
+        public float CurrentTimeScale => timeScale;
+        
+        // Events (for UI, simulation systems)
+        public event Action HourPassed;
+        public event Action DayPassed;
+        
+        // Scales to:
+        public float SeasonalIntensity { get; private set; } = 0f; // -1 winter to +1 summer
+        public float DayLength { get; private set; } = 12f; // hours
+        public float LightLevel { get; private set; } = 1f; // 0-1
 
-        [Header("Current State")]
-        public float OrbitalPosition = 0f; // 0-1 (fraction of year)
-        public float DayAngle = 0f; // 0-1 (0=midnight, 0.5=noon)
-        public float MoonPhase = 0f; // 0-1
-        public float TotalYears = 0f;
+        private float lastHour = -1f;
 
-        [Header("Derived")]
-        public int CurrentDay = 0;
-        public int CurrentYear = 0;
-        public Season CurrentSeason = Season.Spring;
-
-        public float SeasonalIntensity => Mathf.Cos(OrbitalPosition * Mathf.PI * 2f);
-
-        public event Action OnDayChanged;
-        public event Action OnSeasonChanged;
-
-        void Awake()
+        private void Awake()
         {
-            if (Instance != null) { Destroy(gameObject); return; }
             Instance = this;
-            DontDestroyOnLoad(gameObject);
         }
 
-        void Update()
+        private void Update()
         {
-            float deltaTime = Time.deltaTime * TimeScale;
-            
-            // Update orbital position (1 year = OrbitalPeriod days)
-            float daysPassed = deltaTime / (60f * 60f * 24f); // Convert to game-days
-            float yearFraction = daysPassed / OrbitalPeriod;
-            
-            OrbitalPosition += yearFraction;
-            if (OrbitalPosition >= 1f)
+            // Advance game time
+            float delta = Time.deltaTime * timeScale;
+            dayTime += delta / 60f; // Convert to game minutes then hours
+            TotalGameTime += delta;
+
+            // Check for day rollover
+            if (dayTime >= 24f)
             {
-                OrbitalPosition -= 1f;
-                TotalYears++;
-                CurrentYear++;
+                dayTime -= 24f;
+                gameDay++;
+                DayPassed?.Invoke();
+                
+                // Scales to: Season tracking
+                UpdateSeasons();
             }
 
-            // Day angle (24 hour cycle)
-            DayAngle += daysPassed; // Days passed = fractional days
-            int daysAdvanced = 0;
-            while (DayAngle >= 1f)
+            // Check for hour tick
+            int currentHour = Mathf.FloorToInt(dayTime);
+            if (currentHour != lastHour)
             {
-                DayAngle -= 1f;
-                daysAdvanced++;
-            }
-            
-            if (daysAdvanced > 0)
-            {
-                CurrentDay += daysAdvanced;
-                OnDayChanged?.Invoke();
+                lastHour = currentHour;
+                HourPassed?.Invoke();
             }
 
-            // Moon phase
-            MoonPhase += daysPassed / LunarPeriod;
-            if (MoonPhase >= 1f) MoonPhase -= 1f;
-
-            // Update season
-            UpdateSeason();
+            // Update derived values
+            UpdateLightLevel();
         }
 
-        void UpdateSeason()
+        private void UpdateLightLevel()
         {
-            // 0.0-0.25 = Spring, 0.25-0.5 = Summer, 0.5-0.75 = Autumn, 0.75-1.0 = Winter
-            Season newSeason = OrbitalPosition switch
-            {
-                < 0.25f => Season.Spring,
-                < 0.5f => Season.Summer,
-                < 0.75f => Season.Autumn,
-                _ => Season.Winter
-            };
+            // Simple day/night cycle
+            // Noon at 12, midnight at 0/24
+            float dayProgress = dayTime / 24f;
+            LightLevel = Mathf.Sin(dayProgress * Mathf.PI * 2f - Mathf.PI / 2f) * 0.5f + 0.5f;
+            
+            // Scales to: 
+            // - Seasonal light adjustment
+            // - Moon phase at night
+            // - Weather effects
+        }
 
-            if (newSeason != CurrentSeason)
-            {
-                CurrentSeason = newSeason;
-                OnSeasonChanged?.Invoke();
-                Debug.Log($"Season changed to {CurrentSeason}");
-            }
+        private void UpdateSeasons()
+        {
+            // SCALES TO: 
+            // SeasonalIntensity derived from orbital position
+            // Uses axial tilt and day of year
+            // Triggers SeasonChanged event
         }
 
         /// <summary>
-        /// Get day length based on orbital position (for seasonal day length variation).
-        /// </summary>
-        public float GetDayLength()
-        {
-            // Varies with orbital position due to axial tilt
-            return 12f + SeasonalIntensity * (24f - 12f); // 12-24 hours
-        }
-
-        /// <summary>
-        /// Set time scale (player-adjustable).
+        /// Set simulation speed (for player controls)
         /// </summary>
         public void SetTimeScale(float scale)
         {
-            TimeScale = Mathf.Clamp(scale, MinTimeScale, MaxTimeScale);
+            timeScale = Mathf.Clamp(scale, minTimeScale, maxTimeScale);
         }
-    }
 
-    public enum Season
-    {
-        Spring, Summer, Autumn, Winter
+        /// <summary>
+        /// Pause/resume toggle
+        /// </summary>
+        public void TogglePause()
+        {
+            Time.timeScale = Time.timeScale > 0 ? 0f : 1f;
+        }
+
+        /// <summary>
+        /// Scales to: Season queries
+        /// </summary>
+        public float GetTemperatureOffset()
+        {
+            return SeasonalIntensity * 10f; // +/- 10 degrees
+        }
     }
 }
