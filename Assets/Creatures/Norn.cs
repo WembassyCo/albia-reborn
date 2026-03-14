@@ -31,7 +31,7 @@ namespace Albia.Creatures
     /// Integrates sensory input, neural processing, actions, and learning.
     /// </summary>
     [Serializable]
-    public class Norn : MonoBehaviour, IActionConditions
+    public partial class Norn : MonoBehaviour, IActionConditions
     {
         [Header("Neural Configuration")]
         [SerializeField] private int inputSize = 26;   // SensorySystem.TotalInputs

@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using Albia.Creatures.Neural;
 
 namespace Albia.Creatures
 {
