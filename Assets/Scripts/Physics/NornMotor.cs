@@ -1,7 +1,6 @@
 using UnityEngine;
 using UnityEngine.AI;
 using Albia.Core;
-using System.Collections;
 
 namespace Albia.Physics
 {
@@ -9,7 +8,7 @@ namespace Albia.Physics
     [RequireComponent(typeof(NornCollider))]
     public class NornMotor : MonoBehaviour
     {
-        [Header("Movement Settings")]
+        [Header("Movement")]
         public float baseSpeed = 3.5f;
         public float rotationSpeed = 360f;
         public float stoppingDistance = 0.5f;
@@ -25,7 +24,7 @@ namespace Albia.Physics
         public bool faceMovementDirection = true;
         public float maxRotationAngle = 120f;
         
-        [Header("Target Arrival")]
+        [Header("Arrival")]
         public float arrivalThreshold = 0.5f;
         public float slowdownDistance = 3f;
         public AnimationCurve slowdownCurve = AnimationCurve.EaseInOut(0, 1, 1, 0);
@@ -37,35 +36,18 @@ namespace Albia.Physics
         public string eatTrigger = "Eat";
         public string idleTrigger = "Idle";
         
-        [Header("Advanced")]
-        public bool autoRepath = true;
-        public float repathInterval = 0.5f;
-        public bool debugDrawPath = false;
-        
         private NavMeshAgent agent;
         private NornCollider nornCollider;
-        private Organism organism;
-        
         private float currentSpeed;
-        private float targetSpeed;
         private Vector3 currentDestination;
         private Transform currentTarget;
-        private bool hasDestination;
         private bool isMovingToTarget;
         private bool wasMoving;
-        private float repathTimer;
-        
-        public System.Action OnDestinationReached;
-        public System.Action OnStartedMoving;
-        public System.Action OnStoppedMoving;
-
-        public bool IsMoving => isMovingToTarget;
 
         void Awake()
         {
             agent = GetComponent<NavMeshAgent>();
             nornCollider = GetComponent<NornCollider>();
-            organism = GetComponent<Organism>();
             
             if (animator == null)
                 animator = GetComponentInChildren<Animator>();
@@ -77,7 +59,6 @@ namespace Albia.Physics
                 agent.angularSpeed = rotationSpeed;
                 agent.stoppingDistance = stoppingDistance;
                 agent.autoBraking = true;
-                agent.autoRepath = false;
                 agent.updateRotation = false;
             }
         }
@@ -88,14 +69,13 @@ namespace Albia.Physics
             UpdateRotation();
             UpdateAnimation();
             CheckArrival();
-            UpdateRepathing();
             
-            if (nornCollider != null && !nornCollider.IsGrounded && agent.isActiveAndEnabled)
+            if (nornCollider != null && !nornCollider.IsGrounded)
                 agent.enabled = false;
             else if (nornCollider != null && nornCollider.IsGrounded && !agent.enabled)
             {
                 agent.enabled = true;
-                if (hasDestination)
+                if (isMovingToTarget)
                     agent.SetDestination(currentDestination);
             }
         }
@@ -105,21 +85,16 @@ namespace Albia.Physics
             if (!NavMesh.SamplePosition(destination, out NavMeshHit hit, 5f, NavMesh.AllAreas))
                 return;
                 
-            destination = hit.position;
-            currentDestination = destination;
+            currentDestination = hit.position;
             currentTarget = null;
-            hasDestination = true;
             isMovingToTarget = true;
-            targetSpeed = customSpeed ?? baseSpeed;
+            currentSpeed = customSpeed ?? baseSpeed;
             
-            if (agent.isActiveAndEnabled && agent.isOnNavMesh)
+            if (agent.isActiveAndEnabled)
             {
-                agent.SetDestination(destination);
+                agent.SetDestination(currentDestination);
                 agent.isStopped = false;
             }
-            
-            if (!wasMoving)
-                OnStartedMoving?.Invoke();
         }
         
         public void MoveToTarget(Transform target, float? customSpeed = null)
@@ -131,23 +106,17 @@ namespace Albia.Physics
         
         public void Stop()
         {
-            targetSpeed = 0f;
-            hasDestination = false;
-            currentTarget = null;
             isMovingToTarget = false;
-            
             if (agent.isActiveAndEnabled)
             {
                 agent.isStopped = true;
                 agent.ResetPath();
             }
             
-            if (wasMoving)
-            {
-                OnStoppedMoving?.Invoke();
-                if (animator != null)
-                    animator.SetTrigger(idleTrigger);
-            }
+            if (wasMoving && animator != null)
+                animator.SetTrigger(idleTrigger);
+                
+            wasMoving = false;
         }
 
         void UpdateMovement()
@@ -155,33 +124,28 @@ namespace Albia.Physics
             if (!isMovingToTarget) 
             {
                 currentSpeed = Mathf.MoveTowards(currentSpeed, 0f, deceleration * Time.deltaTime);
-                if (agent.isActiveAndEnabled)
-                    agent.speed = currentSpeed;
                 return;
             }
             
             if (agent.isActiveAndEnabled && agent.hasPath)
             {
-                float distanceToTarget = Vector3.Distance(transform.position, currentDestination);
+                float distToTarget = Vector3.Distance(transform.position, currentDestination);
                 
-                if (distanceToTarget < slowdownDistance && distanceToTarget > arrivalThreshold)
+                if (distToTarget < slowdownDistance && distToTarget > arrivalThreshold)
                 {
-                    float t = 1f - (distanceToTarget / slowdownDistance);
-                    targetSpeed = baseSpeed * slowdownCurve.Evaluate(t);
+                    float t = 1f - (distToTarget / slowdownDistance);
+                    agent.speed = baseSpeed * slowdownCurve.Evaluate(t);
                 }
-                
-                if (useSmoothAcceleration)
+                else if (useSmoothAcceleration)
                 {
-                    float speedDiff = targetSpeed - currentSpeed;
-                    float accelStep = (speedDiff > 0 ? acceleration : deceleration) * Time.deltaTime;
-                    currentSpeed += Mathf.Clamp(speedDiff, -accelStep, accelStep);
+                    float speedDiff = currentSpeed - agent.speed;
+                    agent.speed = Mathf.MoveTowards(agent.speed, currentSpeed, 
+                        (speedDiff > 0 ? acceleration : deceleration) * Time.deltaTime);
                 }
                 else
                 {
-                    currentSpeed = targetSpeed;
+                    agent.speed = currentSpeed;
                 }
-                
-                agent.speed = currentSpeed;
             }
         }
         
@@ -189,61 +153,44 @@ namespace Albia.Physics
         {
             if (!faceMovementDirection) return;
             
-            Vector3 desiredVelocity = agent.desiredVelocity;
-            if (desiredVelocity.sqrMagnitude < 0.01f) return;
+            Vector3 desired = agent.desiredVelocity;
+            if (desired.sqrMagnitude < 0.01f) return;
             
-            Quaternion targetRot = Quaternion.LookRotation(desiredVelocity.normalized);
-            transform.rotation = Quaternion.Slerp(
-                transform.rotation,
-                targetRot,
-                rotationDamping * Time.deltaTime * rotationSpeed / 360f
-            );
+            Quaternion targetRot = Quaternion.LookRotation(desired.normalized);
+            transform.rotation = Quaternion.Slerp(transform.rotation, targetRot,
+                rotationDamping * Time.deltaTime * rotationSpeed / 360f);
         }
         
         void UpdateAnimation()
         {
             if (animator == null) return;
             
-            float normalizedSpeed = currentSpeed / baseSpeed;
+            float normSpeed = agent.speed / baseSpeed;
+            
             if (!string.IsNullOrEmpty(speedParam))
-                animator.SetFloat(speedParam, normalizedSpeed);
+                animator.SetFloat(speedParam, normSpeed);
             
             if (!string.IsNullOrEmpty(movingParam))
             {
-                bool isNowMoving = currentSpeed > 0.1f;
-                if (isNowMoving != wasMoving)
+                bool moving = agent.speed > 0.1f;
+                if (moving != wasMoving)
                 {
-                    animator.SetBool(movingParam, isNowMoving);
-                    wasMoving = isNowMoving;
+                    animator.SetBool(movingParam, moving);
+                    wasMoving = moving;
                 }
             }
         }
         
         void CheckArrival()
         {
-            if (!hasDestination || !isMovingToTarget) return;
+            if (!isMovingToTarget) return;
             
-            float distanceToTarget = currentTarget != null 
+            float dist = currentTarget != null 
                 ? Vector3.Distance(transform.position, currentTarget.position)
                 : Vector3.Distance(transform.position, currentDestination);
             
-            if (distanceToTarget <= arrivalThreshold)
-            {
-                OnDestinationReached?.Invoke();
+            if (dist <= arrivalThreshold)
                 Stop();
-            }
-        }
-        
-        void UpdateRepathing()
-        {
-            if (!autoRepath || !isMovingToTarget || currentTarget == null) return;
-            
-            repathTimer += Time.deltaTime;
-            if (repathTimer >= repathInterval)
-            {
-                repathTimer = 0f;
-                MoveTo(currentTarget.position);
-            }
         }
         
         public void TriggerEatAnimation()

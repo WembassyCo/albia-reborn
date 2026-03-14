@@ -23,7 +23,7 @@ namespace Albia.Physics
         public float foodDetectionRadius = 1.5f;
         public LayerMask foodLayer;
         
-        [Header("Physics Settings")]
+        [Header("Physics")]
         public bool autoSyncCenterWithAgent = true;
         public bool useGravity = true;
         
@@ -38,7 +38,6 @@ namespace Albia.Physics
         public System.Action OnGrounded;
         public System.Action OnAirborne;
         
-        private RaycastHit groundHit;
         private bool wasGroundedLastFrame;
 
         void Awake()
@@ -94,7 +93,6 @@ namespace Albia.Physics
         void ConfigureRigidbody()
         {
             if (rb == null) return;
-            
             rb.useGravity = useGravity;
             rb.isKinematic = false;
             rb.interpolation = RigidbodyInterpolation.Interpolate;
@@ -102,7 +100,6 @@ namespace Albia.Physics
             rb.freezeRotation = true;
             rb.mass = 5f;
             rb.drag = 2f;
-            rb.angularDrag = 0.5f;
             rb.constraints = RigidbodyConstraints.FreezeRotation;
         }
 
@@ -111,53 +108,38 @@ namespace Albia.Physics
             Vector3 checkPos = transform.position + colliderCenter;
             
             bool hitGround = Physics.SphereCast(
-                checkPos, 
-                groundCheckRadius, 
-                Vector3.down, 
-                out groundHit,
+                checkPos, groundCheckRadius, Vector3.down, out RaycastHit hit,
                 groundCheckDistance + colliderRadius - groundCheckRadius,
-                groundLayer,
-                QueryTriggerInteraction.Ignore
-            );
+                groundLayer, QueryTriggerInteraction.Ignore);
             
-            bool rayHitGround = Physics.Raycast(
-                transform.position + Vector3.up * 0.1f,
-                Vector3.down,
-                out RaycastHit rayHit,
-                groundCheckDistance + 0.1f,
-                groundLayer,
-                QueryTriggerInteraction.Ignore
-            );
+            bool rayHit = Physics.Raycast(
+                transform.position + Vector3.up * 0.1f, Vector3.down,
+                out RaycastHit rayHit, groundCheckDistance + 0.1f,
+                groundLayer, QueryTriggerInteraction.Ignore);
             
-            IsGrounded = hitGround || rayHitGround;
+            IsGrounded = hitGround || rayHit;
             
             if (IsGrounded)
             {
-                GroundNormal = hitGround ? groundHit.normal : rayHit.normal;
+                GroundNormal = hitGround ? hit.normal : rayHit.normal;
                 
-                // Snap to prevent falling through
-                if (hitGround && groundHit.distance > colliderRadius + groundedOffset)
+                if (hitGround && hit.distance > colliderRadius + groundedOffset)
                 {
-                    float snapDistance = groundHit.distance - colliderRadius;
-                    if (snapDistance > 0.05f && snapDistance < 0.5f)
+                    float snapDist = hit.distance - colliderRadius;
+                    if (snapDist > 0.05f && snapDist < 0.5f)
                     {
                         transform.position = new Vector3(
                             transform.position.x,
-                            groundHit.point.y + colliderRadius + groundedOffset,
-                            transform.position.z
-                        );
+                            hit.point.y + colliderRadius + groundedOffset,
+                            transform.position.z);
                     }
                 }
                 
-                if (!wasGroundedLastFrame)
-                    OnGrounded?.Invoke();
+                if (!wasGroundedLastFrame) OnGrounded?.Invoke();
             }
             else
             {
-                GroundNormal = Vector3.up;
-                
-                if (wasGroundedLastFrame)
-                    OnAirborne?.Invoke();
+                if (wasGroundedLastFrame) OnAirborne?.Invoke();
             }
             
             wasGroundedLastFrame = IsGrounded;
@@ -166,9 +148,7 @@ namespace Albia.Physics
         void SyncWithAgent()
         {
             if (agent == null || !autoSyncCenterWithAgent) return;
-            float agentHeight = agent.height;
-            float agentBase = agent.baseOffset;
-            colliderCenter = new Vector3(0, agentHeight / 2f + agentBase, 0);
+            colliderCenter = new Vector3(0, agent.height / 2f + agent.baseOffset, 0);
             capsuleCollider.center = colliderCenter;
         }
 
@@ -176,9 +156,7 @@ namespace Albia.Physics
         {
             Collider[] foodColliders = Physics.OverlapSphere(
                 transform.position + Vector3.up * colliderCenter.y,
-                foodDetectionRadius,
-                foodLayer
-            );
+                foodDetectionRadius, foodLayer);
             
             foreach (var foodCollider in foodColliders)
             {
@@ -207,17 +185,12 @@ namespace Albia.Physics
                 {
                     if (Vector3.Dot(contact.normal, Vector3.up) < -0.5f)
                     {
-                        Vector3 newPos = transform.position;
-                        newPos.y = Mathf.Min(newPos.y, contact.point.y - colliderHeight);
-                        transform.position = newPos;
+                        Vector3 pos = transform.position;
+                        pos.y = Mathf.Min(pos.y, contact.point.y - colliderHeight);
+                        transform.position = pos;
                     }
                 }
             }
-        }
-
-        public void ForceGroundCheck()
-        {
-            UpdateGroundDetection();
         }
     }
 }
