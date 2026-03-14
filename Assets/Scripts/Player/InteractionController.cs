@@ -1,14 +1,13 @@
 using UnityEngine;
-using UnityEngine.UI;
+using UnityEngine.AI;
 using UnityEngine.EventSystems;
 using Albia.Core;
-using Albia.Physics;
 using Albia.Creatures;
 
 namespace Albia.Player
 {
     /// <summary>
-    /// Enhanced selection and interaction with reliable raycasting and right-click commands.
+    /// Selection controller with reliable raycast and right-click commands.
     /// </summary>
     public class InteractionController : MonoBehaviour
     {
@@ -20,14 +19,11 @@ namespace Albia.Player
         public LayerMask groundLayers;
         public float maxSelectionDistance = 100f;
         
-        [Header("Raycast")]
+        [Header("Selection")]
         public bool useMultipleRaycasts = true;
         public float raycastRadius = 0.2f;
         public int raycastCount = 5;
-        
-        [Header("Selection")]
         public SelectionIndicator selectionIndicatorPrefab;
-        public bool showSelectionIndicator = true;
         public Color selectionColor = new Color(0.3f, 0.8f, 0.3f, 0.8f);
         
         public Organism SelectedOrganism { get; private set; }
@@ -41,7 +37,6 @@ namespace Albia.Player
         {
             Instance = this;
             if (playerCamera == null) playerCamera = Camera.main;
-            
             if (selectableLayers == 0)
                 selectableLayers = LayerMask.GetMask("Creatures", "Default");
             if (groundLayers == 0)
@@ -50,31 +45,28 @@ namespace Albia.Player
 
         void Update()
         {
-            HandleInput();
-            UpdateSelectionIndicator();
-        }
-
-        void HandleInput()
-        {
-            Vector2 mousePos = UnityEngine.InputSystem.Mouse.current.position.ReadValue();
-            bool leftClick = UnityEngine.InputSystem.Mouse.current.leftButton.wasPressedThisFrame;
-            bool rightClick = UnityEngine.InputSystem.Mouse.current.rightButton.wasPressedThisFrame;
-            bool overUI = EventSystem.current && EventSystem.current.IsPointerOverGameObject();
+            if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
+                return;
             
-            if (leftClick && !overUI)
-                TrySelect(mousePos);
+            if (UnityEngine.InputSystem.Mouse.current.leftButton.wasPressedThisFrame)
+                TrySelect(UnityEngine.InputSystem.Mouse.current.position.ReadValue());
             
-            if (rightClick && !overUI && SelectedOrganism != null)
-                TryCommand(mousePos);
+            if (UnityEngine.InputSystem.Mouse.current.rightButton.wasPressedThisFrame && SelectedOrganism != null)
+                TryCommand(UnityEngine.InputSystem.Mouse.current.position.ReadValue());
+            
+            UpdateIndicator();
         }
 
         void TrySelect(Vector2 mousePos)
         {
             Ray ray = playerCamera.ScreenPointToRay(mousePos);
-            Organism organism = useMultipleRaycasts ? RaycastWithRadius(ray) : SimpleRaycast(ray);
             
-            if (organism != null && organism.IsAlive)
-                Select(organism);
+            Organism org = useMultipleRaycasts 
+                ? RaycastWithRadius(ray) 
+                : SimpleRaycast(ray);
+            
+            if (org != null && org.IsAlive)
+                Select(org);
             else
                 Deselect();
         }
@@ -82,39 +74,33 @@ namespace Albia.Player
         Organism SimpleRaycast(Ray ray)
         {
             if (Physics.Raycast(ray, out RaycastHit hit, maxSelectionDistance, selectableLayers))
-                return GetOrganismFromCollider(hit.collider);
+                return GetOrganism(hit.collider);
             return null;
         }
 
         Organism RaycastWithRadius(Ray ray)
         {
-            // Sphere cast
-            if (Physics.SphereCast(ray, raycastRadius, out RaycastHit hit, maxSelectionDistance, selectableLayers))
+            // Try sphere cast first
+            if (Physics.SphereCast(ray, raycastRadius, out RaycastHit sphereHit, maxSelectionDistance, selectableLayers))
             {
-                Organism org = GetOrganismFromCollider(hit.collider);
+                Organism org = GetOrganism(sphereHit.collider);
                 if (org != null) return org;
             }
             
-            // Multiple rays
+            // Try overlapping rays
             Organism best = null;
             float bestDist = float.MaxValue;
-            
-            if (Physics.Raycast(ray, out RaycastHit centerHit, maxSelectionDistance, selectableLayers))
-            {
-                best = GetOrganismFromCollider(centerHit.collider);
-                bestDist = centerHit.distance;
-            }
-            
             float angleStep = 360f / raycastCount;
+            
             for (int i = 0; i < raycastCount; i++)
             {
                 float angle = i * angleStep * Mathf.Deg2Rad;
-                Vector3 offset = new Vector3(Mathf.Cos(angle), Mathf.Sin(angle), 0) * 0.05f;
-                Vector3 newDir = (ray.direction + playerCamera.transform.TransformDirection(offset)).normalized;
+                Vector3 offset = new Vector3(Mathf.Cos(angle), Mathf.Sin(angle), 0) * 0.1f;
+                Vector3 dir = (ray.direction + playerCamera.transform.TransformDirection(offset)).normalized;
                 
-                if (Physics.Raycast(ray.origin, newDir, out RaycastHit h, maxSelectionDistance, selectableLayers))
+                if (Physics.Raycast(ray.origin, dir, out RaycastHit h, maxSelectionDistance, selectableLayers))
                 {
-                    Organism org = GetOrganismFromCollider(h.collider);
+                    Organism org = GetOrganism(h.collider);
                     if (org != null && h.distance < bestDist)
                     {
                         best = org;
@@ -126,15 +112,14 @@ namespace Albia.Player
             return best;
         }
 
-        Organism GetOrganismFromCollider(Collider col)
+        Organism GetOrganism(Collider col)
         {
             if (col == null) return null;
             
-            Organism org = col.GetComponent<Organism>() ?? col.GetComponentInParent<Organism>();
+            Organism org = col.GetComponent<Organism>();
             if (org != null) return org;
             
-            Norn norn = col.GetComponent<Norn>() ?? col.GetComponentInParent<Norn>();
-            return norn as Organism;
+            return col.GetComponentInParent<Organism>();
         }
 
         void Select(Organism organism)
@@ -142,16 +127,11 @@ namespace Albia.Player
             if (SelectedOrganism == organism) return;
             
             // Clear previous
-            if (activeIndicator != null)
-            {
-                Destroy(activeIndicator.gameObject);
-                activeIndicator = null;
-            }
+            Deselect();
             
             SelectedOrganism = organism;
             
-            // Create new indicator
-            if (showSelectionIndicator && selectionIndicatorPrefab != null)
+            if (selectionIndicatorPrefab != null)
             {
                 activeIndicator = Instantiate(selectionIndicatorPrefab);
                 activeIndicator.SetTarget(organism.transform);
@@ -177,12 +157,15 @@ namespace Albia.Player
             OnSelectionCleared?.Invoke();
         }
 
-        void UpdateSelectionIndicator()
+        void UpdateIndicator()
         {
-            if (activeIndicator != null && SelectedOrganism != null)
-                activeIndicator.UpdatePosition();
-            else if (activeIndicator != null)
-                Deselect();
+            if (activeIndicator != null)
+            {
+                if (SelectedOrganism != null)
+                    activeIndicator.UpdatePosition();
+                else
+                    Deselect();
+            }
         }
 
         void TryCommand(Vector2 mousePos)
@@ -195,31 +178,24 @@ namespace Albia.Player
             }
         }
 
-        void CommandTo(Vector3 position)
+        void CommandTo(Vector3 pos)
         {
             if (SelectedOrganism == null) return;
             
-            // Validate position
-            if (NavMesh.SamplePosition(position, out NavMeshHit hit, 5f, NavMesh.AllAreas))
-                position = hit.position;
+            if (NavMesh.SamplePosition(pos, out NavMeshHit hit, 5f, NavMesh.AllAreas))
+                pos = hit.position;
             
-            // Send command
             var motor = SelectedOrganism.GetComponent<NornMotor>();
             if (motor != null)
-                motor.MoveTo(position);
+                motor.MoveTo(pos);
             else
             {
                 var agent = SelectedOrganism.GetComponent<NavMeshAgent>();
                 if (agent != null)
-                    agent.SetDestination(position);
+                    agent.SetDestination(pos);
             }
             
-            OnCommandPosition?.Invoke(position);
-        }
-
-        public bool IsSelected(Organism organism)
-        {
-            return SelectedOrganism == organism;
+            OnCommandPosition?.Invoke(pos);
         }
     }
 }
