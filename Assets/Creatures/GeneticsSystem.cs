@@ -1,6 +1,7 @@
 using UnityEngine;
+using Albia.Creatures.Neural;
 
-namespace AlbiaReborn.Creatures.Genetics
+namespace Albia.Creatures
 {
     /// <summary>
     /// Handles breeding: crossover and mutation.
@@ -15,16 +16,16 @@ namespace AlbiaReborn.Creatures.Genetics
         /// </summary>
         public static GenomeData Breed(GenomeData parentA, GenomeData parentB)
         {
-            float[] offspringGenes = new float[GenomeData.GeneCount];
+            float[] offspringGenes = new float[GenomeData.TotalGenes];
             
             // Two-point crossover
-            int point1 = _random.Next(GenomeData.GeneCount);
-            int point2 = _random.Next(GenomeData.GeneCount);
+            int point1 = _random.Next(GenomeData.TotalGenes);
+            int point2 = _random.Next(GenomeData.TotalGenes);
             
             if (point1 > point2)
                 (point1, point2) = (point2, point1);
 
-            for (int i = 0; i < GenomeData.GeneCount; i++)
+            for (int i = 0; i < GenomeData.TotalGenes; i++)
             {
                 // Take middle segment from parentB, rest from parentA
                 if (i >= point1 && i <= point2)
@@ -33,11 +34,11 @@ namespace AlbiaReborn.Creatures.Genetics
                     offspringGenes[i] = parentA.GetGene(i);
             }
 
-            // Mutation pass
-            Mutate(offspringGenes, parentA.GetGene(GenomeData.METABOLISM_RATE));
+            // Mutation pass - use first gene as mutation rate modifier
+            Mutate(offspringGenes, parentA.GetGene(0));
 
             // Clamp to valid range
-            for (int i = 0; i < GenomeData.GeneCount; i++)
+            for (int i = 0; i < GenomeData.TotalGenes; i++)
             {
                 offspringGenes[i] = Mathf.Clamp01(offspringGenes[i]);
             }
