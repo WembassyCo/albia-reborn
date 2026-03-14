@@ -13,10 +13,12 @@ GameObject:
   - component: {fileID: 13600000}
   - component: {fileID: 5400000}
   - component: {fileID: 19500000}
-  - component: {fileID: 11400000}
-  m_Layer: 0
+  - component: {fileID: 11400010}
+  - component: {fileID: 11400020}
+  - component: {fileID: 11400030}
+  m_Layer: 9
   m_Name: Norn
-  m_TagString: Untagged
+  m_TagString: Creature
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -116,7 +118,7 @@ NavMeshAgent:
   m_Acceleration: 8
   avoidancePriority: 50
   m_AngularSpeed: 120
-  m_StoppingDistance: 0
+  m_StoppingDistance: 0.5
   m_AutoTraverseOffMeshLink: 1
   m_AutoBraking: 1
   m_AutoRepath: 1
@@ -124,16 +126,17 @@ NavMeshAgent:
   m_BaseOffset: 1
   m_WalkableMask: 4294967295
   m_ObstacleAvoidanceType: 4
---- !u!114 &11400000
+--- !u!114 &11400010
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_PrefabParentObject: {fileID: 0}
   m_PrefabInternal: {fileID: 100100000}
   m_GameObject: {fileID: 100000}
   m_Enabled: 1
-  m_Script: {fileID: 11500000, guid: norn-script-placeholder, type: 3}
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: norn-class-placeholder, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: 
+  m_EditorClassIdentifier: Albia.Creatures.Norn
   maxEnergy: 100
   currentEnergy: 80
   metabolismRate: 0.1
@@ -142,6 +145,34 @@ MonoBehaviour:
   hungerThreshold: 60
   movementCost: 0.05
   foodSearchRadius: 20
+--- !u!114 &11400020
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_PrefabParentObject: {fileID: 0}
+  m_PrefabInternal: {fileID: 100100000}
+  m_GameObject: {fileID: 100000}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: neural-brain-placeholder, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Albia.AI.NeuralBrain
+  decisionInterval: 0.1
+  walkSpeed: 3.5
+  turnSpeed: 120
+  actionThreshold: 0.3
+--- !u!114 &11400030
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_PrefabParentObject: {fileID: 0}
+  m_PrefabInternal: {fileID: 100100000}
+  m_GameObject: {fileID: 100000}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: norn-ai-placeholder, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Albia.Creatures.NornAI
+  walkSpeed: 3.5
+  rotationSpeed: 120
 --- !u!1001 &100100000
 Prefab:
   m_ObjectHideFlags: 0
