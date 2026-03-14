@@ -3,7 +3,9 @@
     "rootNamespace": "AlbiaReborn.Tests.PlayMode",
     "references": [
         "UnityEngine.TestRunner",
-        "UnityEditor.TestRunner"
+        "UnityEditor.TestRunner",
+        "Albia.Creatures",
+        "Albia.Systems.SaveSystem"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
