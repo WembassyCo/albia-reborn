@@ -1,8 +1,8 @@
 using UnityEngine;
-using AlbiaReborn.World.Voxel;
-using AlbiaReborn.Creatures;
+using Albia.World.Voxel;
+using Albia.Creatures;
 
-namespace AlbiaReborn.Player
+namespace Albia.Player
 {
     /// <summary>
     /// Player building system - place structures.

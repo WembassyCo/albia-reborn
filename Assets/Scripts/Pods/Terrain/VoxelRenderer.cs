@@ -1,9 +1,9 @@
 using System.Collections.Generic;
-using AlbiaReborn.Core.Shared;
+using Albia.Core.Shared;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-namespace AlbiaReborn.Pods.Terrain
+namespace Albia.Pods.Terrain
 {
     /// <summary>
     /// Renders voxel chunks in Unity using MeshFilter/MeshRenderer.

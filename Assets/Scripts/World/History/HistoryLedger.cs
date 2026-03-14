@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 
-namespace AlbiaReborn.World.History
+namespace Albia.World.History
 {
     /// <summary>
     /// Stores and queries historical data.

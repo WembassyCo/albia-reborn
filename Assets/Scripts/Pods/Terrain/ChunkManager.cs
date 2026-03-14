@@ -1,11 +1,11 @@
 using System;
 using System.Collections.Generic;
-using AlbiaReborn.Core.Interfaces;
-using AlbiaReborn.Core.Shared;
+using Albia.Core.Interfaces;
+using Albia.Core.Shared;
 using UnityEngine;
 using UnityEngine.AI;
 
-namespace AlbiaReborn.Pods.Terrain
+namespace Albia.Pods.Terrain
 {
     /// <summary>
     /// Manages chunk loading, voxel modifications, and mesh generation.

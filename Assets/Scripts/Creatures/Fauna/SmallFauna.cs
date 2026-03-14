@@ -1,10 +1,10 @@
 using System.Collections.Generic;
 using UnityEngine;
-using AlbiaReborn.Creatures;
-using AlbiaReborn.Creatures.Genetics;
-using AlbiaReborn.Creatures.Neural;
+using Albia.Creatures;
+using Albia.Creatures.Genetics;
+using Albia.Creatures.Neural;
 
-namespace AlbiaReborn.Creatures.Fauna
+namespace Albia.Creatures.Fauna
 {
     /// <summary>
     /// Small fauna (rodents, fish, birds) - 15 neurons.

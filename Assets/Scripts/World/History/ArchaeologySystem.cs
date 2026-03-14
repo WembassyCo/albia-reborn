@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace AlbiaReborn.World.History
+namespace Albia.World.History
 {
     /// <summary>
     /// Places physical traces of history in the world.

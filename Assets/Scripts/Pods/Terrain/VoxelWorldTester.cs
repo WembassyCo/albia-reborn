@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace AlbiaReborn.Pods.Terrain
+namespace Albia.Pods.Terrain
 {
     /// <summary>
     /// Test script for voxel world initialization.

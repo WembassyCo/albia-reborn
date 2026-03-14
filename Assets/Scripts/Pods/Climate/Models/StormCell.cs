@@ -1,6 +1,6 @@
-using AlbiaReborn.Climate.Interfaces;
+using Albia.Climate.Interfaces;
 
-namespace AlbiaReborn.Climate.Models;
+namespace Albia.Climate.Models;
 
 /// <summary>
 /// Represents a weather storm system in the world

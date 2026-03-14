@@ -1,9 +1,9 @@
 using System;
 using UnityEngine;
-using AlbiaReborn.Creatures;
-using AlbiaReborn.Core;
+using Albia.Creatures;
+using Albia.Core;
 
-namespace AlbiaReborn.World.History
+namespace Albia.World.History
 {
     /// <summary>
     /// Tracks notable events in the simulation.

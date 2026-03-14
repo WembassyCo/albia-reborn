@@ -1,8 +1,8 @@
 using System;
-using AlbiaReborn.Core.Shared;
+using Albia.Core.Shared;
 using UnityEngine;
 
-namespace AlbiaReborn.Core.Interfaces
+namespace Albia.Core.Interfaces
 {
     /// <summary>
     /// Interface for querying and modifying terrain voxels.

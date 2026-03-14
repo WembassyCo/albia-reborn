@@ -1,9 +1,9 @@
 using System;
-using AlbiaReborn.Core.Interfaces;
-using AlbiaReborn.Core.Shared;
+using Albia.Core.Interfaces;
+using Albia.Core.Shared;
 using UnityEngine;
 
-namespace AlbiaReborn.Pods.Terrain
+namespace Albia.Pods.Terrain
 {
     /// <summary>
     /// Represents a 16x16x16 voxel chunk with density-based mesh generation

@@ -1,4 +1,4 @@
-namespace AlbiaReborn.Climate;
+namespace Albia.Climate;
 
 /// <summary>
 /// Whittaker biome classification system

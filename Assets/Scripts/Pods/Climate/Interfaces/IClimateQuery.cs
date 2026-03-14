@@ -1,4 +1,4 @@
-namespace AlbiaReborn.Climate.Interfaces;
+namespace Albia.Climate.Interfaces;
 
 /// <summary>
 /// Interface for querying climate data from the world

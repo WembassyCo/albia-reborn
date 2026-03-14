@@ -2,11 +2,11 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.AI;
-using AlbiaReborn.Creatures;
-using AlbiaReborn.Creatures.Genetics;
-using AlbiaReborn.World.Generation;
+using Albia.Creatures;
+using Albia.Creatures.Genetics;
+using Albia.World.Generation;
 
-namespace AlbiaReborn.World.History
+namespace Albia.World.History
 {
     /// <summary>
     /// Runs abstract historical simulation before player enters world.

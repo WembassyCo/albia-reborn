@@ -1,8 +1,8 @@
 using UnityEngine;
-using AlbiaReborn.Creatures;
-using AlbiaReborn.Creatures.Biochemistry;
+using Albia.Creatures;
+using Albia.Creatures.Biochemistry;
 
-namespace AlbiaReborn.Player
+namespace Albia.Player
 {
     /// <summary>
     /// Player teaches Norns words by pointing and vocalizing.

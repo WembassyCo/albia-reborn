@@ -1,8 +1,8 @@
 using UnityEngine;
-using AlbiaReborn.Core;
-using AlbiaReborn.World;
+using Albia.Core;
+using Albia.World;
 
-namespace AlbiaReborn
+namespace Albia
 {
     /// <summary>
     /// Bootstrap entry point for the game.

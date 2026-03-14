@@ -1,8 +1,8 @@
 using UnityEngine;
-using AlbiaReborn.Creatures;
-using AlbiaReborn.Creatures.Genetics;
+using Albia.Creatures;
+using Albia.Creatures.Genetics;
 
-namespace AlbiaReborn.Creatures.Predators
+namespace Albia.Creatures.Predators
 {
     /// <summary>
     /// Apex predator - 40 neurons, territorial hunting.

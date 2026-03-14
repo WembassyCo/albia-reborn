@@ -3,11 +3,11 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using AlbiaReborn.Core.Interfaces;
-using AlbiaReborn.Core.Shared;
+using Albia.Core.Interfaces;
+using Albia.Core.Shared;
 using UnityEngine;
 
-namespace AlbiaReborn.Pods.Terrain
+namespace Albia.Pods.Terrain
 {
     /// <summary>
     /// Central manager for the voxel world. Handles chunk loading, LOD system,

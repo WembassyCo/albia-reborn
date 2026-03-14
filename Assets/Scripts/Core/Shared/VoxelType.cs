@@ -1,4 +1,4 @@
-namespace AlbiaReborn.Core.Shared
+namespace Albia.Core.Shared
 {
     /// <summary>
     /// Enumeration of all voxel types in the Albia world.

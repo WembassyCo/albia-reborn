@@ -1,8 +1,8 @@
 using UnityEngine;
-using AlbiaReborn.Creatures;
-using AlbiaReborn.Creatures.Biochemistry;
+using Albia.Creatures;
+using Albia.Creatures.Biochemistry;
 
-namespace AlbiaReborn.World.Climate
+namespace Albia.World.Climate
 {
     /// <summary>
     /// Storm system: weather grid, precipitation, creature response.

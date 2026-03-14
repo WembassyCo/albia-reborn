@@ -3,7 +3,7 @@ using System.Threading.Tasks;
 using UnityEngine;
 using Random = UnityEngine.Random;
 
-namespace AlbiaReborn.Core
+namespace Albia.Core
 {
     /// <summary>
     /// Test component for validating SaveManager functionality.

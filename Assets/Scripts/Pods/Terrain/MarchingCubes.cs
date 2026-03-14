@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
-using AlbiaReborn.Core.Shared;
+using Albia.Core.Shared;
 using UnityEngine;
 
-namespace AlbiaReborn.Pods.Terrain
+namespace Albia.Pods.Terrain
 {
     /// <summary>
     /// Implements the classic Marching Cubes algorithm for voxel mesh generation.

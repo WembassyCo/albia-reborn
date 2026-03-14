@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace AlbiaReborn.Creatures.Ecology
+namespace Albia.Creatures.Ecology
 {
     /// <summary>
     /// Insect swarm using boids algorithm.

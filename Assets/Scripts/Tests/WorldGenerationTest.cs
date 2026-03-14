@@ -2,11 +2,11 @@ using System.Collections;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
-using AlbiaReborn.World.Generation;
-using AlbiaReborn.World.Voxel;
-using AlbiaReborn.World.Climate;
+using Albia.World.Generation;
+using Albia.World.Voxel;
+using Albia.World.Climate;
 
-namespace AlbiaReborn.Tests
+namespace Albia.Tests
 {
     /// <summary>
     /// Integration tests for MVP world generation.

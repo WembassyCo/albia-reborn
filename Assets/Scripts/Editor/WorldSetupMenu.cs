@@ -1,9 +1,9 @@
 using UnityEditor;
 using UnityEngine;
-using AlbiaReborn.Creatures;
-using AlbiaReborn.Creatures.Genetics;
+using Albia.Creatures;
+using Albia.Creatures.Genetics;
 
-namespace AlbiaReborn.Editor
+namespace Albia.Editor
 {
     /// <summary>
     /// Quick world setup menu for testing.

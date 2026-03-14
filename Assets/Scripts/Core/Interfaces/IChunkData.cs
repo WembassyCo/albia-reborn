@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace AlbiaReborn.Core.Interfaces
+namespace Albia.Core.Interfaces
 {
     /// <summary>
     /// Interface for chunk data access and manipulation.

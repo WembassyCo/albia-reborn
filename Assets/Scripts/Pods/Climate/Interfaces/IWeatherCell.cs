@@ -1,4 +1,4 @@
-namespace AlbiaReborn.Climate.Interfaces;
+namespace Albia.Climate.Interfaces;
 
 /// <summary>
 /// Interface representing a single cell in the weather grid
