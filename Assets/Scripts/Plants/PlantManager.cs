@@ -58,13 +58,11 @@ namespace Albia.Plants
         [SerializeField] private int initialCarrotCount = 15;
         [SerializeField] private int initialBushCount = 8;
 
-        // Tracking
         private List<PlantOrganism> allPlants = new List<PlantOrganism>();
         private Dictionary<PlantSpecies, List<PlantOrganism>> plantsBySpecies = new Dictionary<PlantSpecies, List<PlantOrganism>>();
         private Dictionary<Vector2Int, RegionData> regionGrid = new Dictionary<Vector2Int, RegionData>();
         private float regionSize = 10f;
 
-        // Integration
         private EcologyManager ecologyManager;
 
         public IReadOnlyList<PlantOrganism> AllPlants => allPlants;
@@ -88,7 +86,6 @@ namespace Albia.Plants
 
         void Update()
         {
-            // Periodic cleanup and region updates
             if (Time.frameCount % 60 == 0)
             {
                 CleanupDeadPlants();
@@ -96,36 +93,25 @@ namespace Albia.Plants
             }
         }
 
-        /// <summary>
-        /// Initialize tracking dictionaries
-        /// </summary>
         private void InitializeDictionaries()
         {
             plantsBySpecies[PlantSpecies.Carrot] = new List<PlantOrganism>();
             plantsBySpecies[PlantSpecies.Bush] = new List<PlantOrganism>();
         }
 
-        /// <summary>
-        /// Spawn initial ecosystem plants
-        /// </summary>
         private void SpawnInitialPlants()
         {
-            // Carrots - fast growing, scattered
             for (int i = 0; i < initialCarrotCount; i++)
             {
                 SpawnPlantAtRandomLocation(PlantSpecies.Carrot, PlantGrowthStage.Mature);
             }
 
-            // Bushes - fewer, more spread out
             for (int i = 0; i < initialBushCount; i++)
             {
                 SpawnPlantAtRandomLocation(PlantSpecies.Bush, PlantGrowthStage.Mature);
             }
         }
 
-        /// <summary>
-        /// Spawn a plant at a random valid location
-        /// </summary>
         public PlantOrganism SpawnPlantAtRandomLocation(PlantSpecies species, PlantGrowthStage startStage = PlantGrowthStage.Seed)
         {
             if (allPlants.Count >= globalMaxPlants) return null;
@@ -133,7 +119,6 @@ namespace Albia.Plants
             Vector2 randomCircle = Random.insideUnitCircle * worldRadius;
             Vector3 spawnPos = new Vector3(randomCircle.x, 0.5f, randomCircle.y);
             
-            // Validate position
             if (!IsValidPlantLocation(spawnPos, species))
             {
                 return null;
@@ -142,9 +127,6 @@ namespace Albia.Plants
             return SpawnPlant(species, spawnPos, startStage);
         }
 
-        /// <summary>
-        /// Spawn a plant at specific position
-        /// </summary>
         public PlantOrganism SpawnPlant(PlantSpecies species, Vector3 position, PlantGrowthStage startStage = PlantGrowthStage.Seed)
         {
             if (!CanSpawnSeedInArea(position, species)) return null;
@@ -152,7 +134,6 @@ namespace Albia.Plants
             GameObject prefab = GetPrefabForSpecies(species);
             if (prefab == null)
             {
-                // Create ad-hoc if no prefab
                 GameObject plantObj = new GameObject($"Plant_{species}");
                 plantObj.transform.position = position;
                 
@@ -169,22 +150,12 @@ namespace Albia.Plants
             if (newPlant != null)
             {
                 newPlant.SetSpecies(species);
-                
-                // Force to specific stage if needed
-                if (startStage != PlantGrowthStage.Seed)
-                {
-                    // Plant will progress naturally, but we could force it here
-                }
-                
                 RegisterPlant(newPlant);
             }
 
             return newPlant;
         }
 
-        /// <summary>
-        /// Register a plant with the manager
-        /// </summary>
         public void RegisterPlant(PlantOrganism plant)
         {
             if (plant == null || allPlants.Contains(plant)) return;
@@ -196,16 +167,10 @@ namespace Albia.Plants
                 plantsBySpecies[plant.Species].Add(plant);
             }
 
-            // Subscribe to events
             plant.OnPlantDeath += OnPlantDied;
-            
-            // Update region data
             UpdatePlantRegion(plant);
         }
 
-        /// <summary>
-        /// Unregister a plant
-        /// </summary>
         public void UnregisterPlant(PlantOrganism plant)
         {
             if (plant == null) return;
@@ -219,24 +184,18 @@ namespace Albia.Plants
             }
         }
 
-        /// <summary>
-        /// Check if a seed can grow in this area (carrying capacity)
-        /// </summary>
         public bool CanSpawnSeedInArea(Vector3 position, PlantSpecies species)
         {
             SpeciesSettings settings = GetSettingsForSpecies(species);
             
-            // Global limit
             if (allPlants.Count >= globalMaxPlants) return false;
             
-            // Species limit
             if (plantsBySpecies.ContainsKey(species) && 
                 plantsBySpecies[species].Count >= settings.maxPopulation)
             {
                 return false;
             }
 
-            // Local density check
             Collider[] nearby = Physics.OverlapSphere(position, settings.carryingCapacityRadius);
             int plantCount = 0;
             
@@ -247,7 +206,7 @@ namespace Albia.Plants
                     plantCount++;
                     if (plantCount >= settings.maxPlantsInRadius)
                     {
-                        return false; // Too crowded
+                        return false;
                     }
                 }
             }
@@ -255,24 +214,17 @@ namespace Albia.Plants
             return true;
         }
 
-        /// <summary>
-        /// Check if location is valid for planting
-        /// </summary>
         public bool IsValidPlantLocation(Vector3 position, PlantSpecies species)
         {
-            // Check carrying capacity
             if (!CanSpawnSeedInArea(position, species)) return false;
 
-            // Check for obstacles
             if (Physics.CheckSphere(position, 0.5f, LayerMask.GetMask("Obstacle")))
             {
                 return false;
             }
 
-            // Check for valid ground
             if (Physics.Raycast(position + Vector3.up, Vector3.down, out RaycastHit hit, 2f))
             {
-                // Make sure we hit ground/terrain
                 return hit.collider.gameObject.layer == LayerMask.NameToLayer("Ground") ||
                        hit.collider.CompareTag("Terrain");
             }
@@ -280,9 +232,6 @@ namespace Albia.Plants
             return false;
         }
 
-        /// <summary>
-        /// Get nearest food source for creatures
-        /// </summary>
         public PlantOrganism GetNearestEdiblePlant(Vector3 position, float maxDistance = float.MaxValue)
         {
             PlantOrganism nearest = null;
@@ -303,9 +252,6 @@ namespace Albia.Plants
             return nearest;
         }
 
-        /// <summary>
-        /// Get total nutrition available in ecosystem
-        /// </summary>
         public float GetTotalNutritionAvailable()
         {
             float total = 0f;
@@ -319,9 +265,6 @@ namespace Albia.Plants
             return total;
         }
 
-        /// <summary>
-        /// Get population count for species
-        /// </summary>
         public int GetPopulationCount(PlantSpecies species)
         {
             if (plantsBySpecies.ContainsKey(species))
@@ -331,17 +274,11 @@ namespace Albia.Plants
             return 0;
         }
 
-        /// <summary>
-        /// Called when a plant dies
-        /// </summary>
         private void OnPlantDied(PlantOrganism plant)
         {
             UnregisterPlant(plant);
         }
 
-        /// <summary>
-        /// Cleanup destroyed/null plants
-        /// </summary>
         private void CleanupDeadPlants()
         {
             allPlants.RemoveAll(p => p == null);
@@ -352,9 +289,6 @@ namespace Albia.Plants
             }
         }
 
-        /// <summary>
-        /// Update region grid data
-        /// </summary>
         private void UpdateRegionData()
         {
             regionGrid.Clear();
@@ -366,9 +300,6 @@ namespace Albia.Plants
             }
         }
 
-        /// <summary>
-        /// Update which region a plant belongs to
-        /// </summary>
         private void UpdatePlantRegion(PlantOrganism plant)
         {
             Vector3 pos = plant.transform.position;
@@ -385,21 +316,15 @@ namespace Albia.Plants
             regionGrid[regionCoord].AddPlant(plant);
         }
 
-        /// <summary>
-        /// Get settings for species
-        /// </summary>
         private SpeciesSettings GetSettingsForSpecies(PlantSpecies species)
         {
             foreach (var setting in speciesSettings)
             {
                 if (setting.species == species) return setting;
             }
-            return speciesSettings[0]; // Default to first
+            return speciesSettings[0];
         }
 
-        /// <summary>
-        /// Get prefab for species
-        /// </summary>
         private GameObject GetPrefabForSpecies(PlantSpecies species)
         {
             return species switch
@@ -410,17 +335,11 @@ namespace Albia.Plants
             };
         }
 
-        /// <summary>
-        /// Get seed prefab
-        /// </summary>
         public GameObject GetSeedPrefab()
         {
             return seedPrefab;
         }
 
-        /// <summary>
-        /// Debug info about ecosystem
-        /// </summary>
         public string GetEcosystemReport()
         {
             int carrots = GetPopulationCount(PlantSpecies.Carrot);
@@ -434,11 +353,9 @@ namespace Albia.Plants
 
         void OnDrawGizmosSelected()
         {
-            // Draw ecosystem bounds
             Gizmos.color = Color.green;
             Gizmos.DrawWireCube(Vector3.zero, new Vector3(worldRadius * 2, 2, worldRadius * 2));
 
-            // Draw plant positions
             Gizmos.color = Color.yellow;
             foreach (var plant in allPlants)
             {
@@ -449,9 +366,6 @@ namespace Albia.Plants
             }
         }
 
-        /// <summary>
-        /// Region data for spatial partitioning
-        /// </summary>
         private class RegionData
         {
             public List<PlantOrganism> Plants { get; private set; } = new List<PlantOrganism>();

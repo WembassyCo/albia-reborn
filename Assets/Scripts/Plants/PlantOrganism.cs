@@ -18,16 +18,16 @@ namespace Albia.Plants
         [Header("Growth Settings")]
         [SerializeField] private PlantGrowthStage currentStage = PlantGrowthStage.Seed;
         [SerializeField] private float growthProgress = 0f;
-        [SerializeField] private float seedGrowTime = 5f;      // Time to sprout
-        [SerializeField] private float sproutGrowTime = 10f;   // Time to mature
+        [SerializeField] private float seedGrowTime = 5f;
+        [SerializeField] private float sproutGrowTime = 10f;
 
         [Header("Health & Nutrition")]
         [SerializeField] private float maxHealth = 100f;
         [SerializeField] private float currentHealth = 100f;
-        [SerializeField] private float nutritionValue = 15f;   // Energy given when eaten
+        [SerializeField] private float nutritionValue = 15f;
 
         [Header("Reproduction")]
-        [SerializeField] private float seedInterval = 15f;     // Seconds between seed drops
+        [SerializeField] private float seedInterval = 15f;
         [SerializeField] private int seedsPerDrop = 3;
         [SerializeField] private float seedSpreadRadius = 3f;
         [SerializeField] private GameObject seedPrefab;
@@ -38,11 +38,9 @@ namespace Albia.Plants
         [SerializeField] private GameObject sproutVisual;
         [SerializeField] private GameObject matureVisual;
 
-        // Events
         public event Action<PlantOrganism> OnPlantDeath;
         public event Action<PlantOrganism> OnMature;
 
-        // Properties
         public PlantSpecies Species => species;
         public PlantGrowthStage CurrentStage => currentStage;
         public bool IsMature => currentStage == PlantGrowthStage.Mature;
@@ -51,7 +49,6 @@ namespace Albia.Plants
         public float CurrentHealth => currentHealth;
         public float MaxHealth => maxHealth;
 
-        // Private state
         private float timeSinceLastSeed = 0f;
         private float timeInCurrentStage = 0f;
         private PlantManager plantManager;
@@ -62,13 +59,11 @@ namespace Albia.Plants
         {
             plantManager = PlantManager.Instance;
             
-            // Find visuals if not assigned
             if (visualRoot == null) visualRoot = transform;
             if (seedVisual == null) seedVisual = visualRoot.Find("SeedVisual")?.gameObject;
             if (sproutVisual == null) sproutVisual = visualRoot.Find("SproutVisual")?.gameObject;
             if (matureVisual == null) matureVisual = visualRoot.Find("MatureVisual")?.gameObject;
             
-            // Get or add collider for eating/detection
             plantCollider = GetComponent<BoxCollider>();
             if (plantCollider == null)
             {
@@ -76,25 +71,21 @@ namespace Albia.Plants
                 plantCollider.isTrigger = true;
             }
             
-            // Set layer for detection
             gameObject.layer = LayerMask.NameToLayer("Food");
-            if (gameObject.layer == 0) gameObject.layer = 8; // Fallback
+            if (gameObject.layer == 0) gameObject.layer = 8;
             tag = "Food";
         }
 
         void Start()
         {
-            // Apply species settings
             ApplySpeciesSettings();
             
-            // Register with manager
             if (plantManager != null && !isRegistered)
             {
                 plantManager.RegisterPlant(this);
                 isRegistered = true;
             }
             
-            // Initialize visual state
             UpdateVisuals();
             UpdateColliderSize();
         }
@@ -104,11 +95,8 @@ namespace Albia.Plants
             if (!IsAlive) return;
 
             timeInCurrentStage += Time.deltaTime;
-
-            // Growth progression
             UpdateGrowth();
             
-            // Reproduction for mature plants
             if (IsMature)
             {
                 timeSinceLastSeed += Time.deltaTime;
@@ -119,7 +107,6 @@ namespace Albia.Plants
                 }
             }
 
-            // Visual updates
             UpdateVisuals();
         }
 
@@ -149,15 +136,11 @@ namespace Albia.Plants
             }
         }
 
-        /// <summary>
-        /// Apply species-specific settings
-        /// </summary>
         private void ApplySpeciesSettings()
         {
             switch (species)
             {
                 case PlantSpecies.Carrot:
-                    // Fast growing, less nutrition
                     seedGrowTime = 3f;
                     sproutGrowTime = 6f;
                     seedInterval = 12f;
@@ -167,7 +150,6 @@ namespace Albia.Plants
                     break;
                     
                 case PlantSpecies.Bush:
-                    // Slow growing, lots of food
                     seedGrowTime = 8f;
                     sproutGrowTime = 20f;
                     seedInterval = 25f;
@@ -180,9 +162,6 @@ namespace Albia.Plants
             currentHealth = maxHealth;
         }
 
-        /// <summary>
-        /// Progress through growth stages
-        /// </summary>
         private void UpdateGrowth()
         {
             switch (currentStage)
@@ -203,9 +182,6 @@ namespace Albia.Plants
             }
         }
 
-        /// <summary>
-        /// Transition to a new growth stage
-        /// </summary>
         private void TransitionToStage(PlantGrowthStage newStage)
         {
             currentStage = newStage;
@@ -219,29 +195,22 @@ namespace Albia.Plants
             UpdateColliderSize();
         }
 
-        /// <summary>
-        /// Spawn seeds for reproduction
-        /// </summary>
         private void SpawnSeeds()
         {
             if (seedPrefab == null) return;
             if (plantManager == null) return;
 
-            // Check carrying capacity
             if (!plantManager.CanSpawnSeedInArea(transform.position, species))
             {
-                // Overcrowded - take damage instead
                 TakeDamage(maxHealth * 0.1f);
                 return;
             }
 
             for (int i = 0; i < seedsPerDrop; i++)
             {
-                // Random position around plant
                 Vector2 randomCircle = UnityEngine.Random.insideUnitCircle * seedSpreadRadius;
                 Vector3 spawnPos = transform.position + new Vector3(randomCircle.x, 1f, randomCircle.y);
                 
-                // Create seed
                 GameObject seedObj = Instantiate(seedPrefab, spawnPos, Quaternion.identity);
                 
                 Seed seed = seedObj.GetComponent<Seed>();
@@ -252,25 +221,19 @@ namespace Albia.Plants
             }
         }
 
-        /// <summary>
-        /// Called when eaten by a Norn
-        /// </summary>
         public bool TryConsume(out float nutrition)
         {
             nutrition = 0f;
             
             if (!IsAlive) return false;
-            if (currentStage == PlantGrowthStage.Seed) return false; // Seeds not edible
+            if (currentStage == PlantGrowthStage.Seed) return false;
 
             nutrition = NutritionValue;
-            TakeDamage(maxHealth * 0.5f); // Eating damages the plant
+            TakeDamage(maxHealth * 0.5f);
             
             return true;
         }
 
-        /// <summary>
-        /// Apply damage to the plant
-        /// </summary>
         public void TakeDamage(float damage)
         {
             currentHealth -= damage;
@@ -281,27 +244,19 @@ namespace Albia.Plants
             }
         }
 
-        /// <summary>
-        /// Die from damage/disease/overcrowding
-        /// </summary>
         private void Die()
         {
             currentHealth = 0f;
             OnPlantDeath?.Invoke(this);
             
-            // Notify ecology system
             if (plantManager != null)
             {
                 plantManager.UnregisterPlant(this);
             }
             
-            // Disable or destroy
             gameObject.SetActive(false);
         }
 
-        /// <summary>
-        /// Update visuals based on current growth stage
-        /// </summary>
         private void UpdateVisuals()
         {
             if (seedVisual != null) seedVisual.SetActive(currentStage == PlantGrowthStage.Seed);
@@ -309,9 +264,6 @@ namespace Albia.Plants
             if (matureVisual != null) matureVisual.SetActive(currentStage == PlantGrowthStage.Mature);
         }
 
-        /// <summary>
-        /// Update collider size based on stage
-        /// </summary>
         private void UpdateColliderSize()
         {
             if (plantCollider == null) return;
@@ -330,18 +282,12 @@ namespace Albia.Plants
             }
         }
 
-        /// <summary>
-        /// Set the plant species (must be called before Start)
-        /// </summary>
         public void SetSpecies(PlantSpecies newSpecies)
         {
             species = newSpecies;
             ApplySpeciesSettings();
         }
 
-        /// <summary>
-        /// Set prefab references
-        /// </summary>
         public void SetPrefabs(GameObject seed, GameObject sprout, GameObject mature)
         {
             seedPrefab = seed;
